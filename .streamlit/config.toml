@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#2C3E50"        # Midnight Blue (Buttons, Highlights)
+backgroundColor = "#F9F7F1"     # Warm Paper
+secondaryBackgroundColor = "#E6E1D3"  # Parchment (Sidebar, containers)
+textColor = "#333333"           # Charcoal Text
+font = "serif"                  # Serif font for "Journal" look

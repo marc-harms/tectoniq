@@ -1,0 +1,17 @@
+Welcome to TECTONIQ Beta!
+
+We're excited to have you here. This platform uses Self-Organized Criticality (SOC) physics to analyze market behavior and identify regime changes. This App is still in beta and may undergo significant changes based on user feedback.
+
+Current Features:
+- Asset Deep Dive analysis with regime classification
+- Portfolio Simulation with DCA strategy backtesting
+- Real-time criticality and instability scoring
+- Sharing analysis dashboard and asset hero cards
+
+We are planning to introduce some premium Features soon:
+- Portfolio management and tracking
+- Email alerts for regime changes
+- Advanced simulation strategies
+- Priority support
+
+Stay tuned for updates!
