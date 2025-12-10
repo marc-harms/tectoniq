@@ -548,15 +548,68 @@ class SOCAnalyzer:
         # --- Chart 3: Criticality (Main SOC Chart) ---
         fig3 = make_subplots(specs=[[{"secondary_y": True}]])
         
-        # Scientific Heritage color map - precise earth tones
-        color_map = {
-            "low": "#27AE60",      # Forest Green (Stable)
-            "normal": "#52BE80",   # Light green (Normal)
-            "medium": "#F1C40F",   # Muted Gold (Active)
-            "high": "#D35400",     # Pumpkin/Ochre (High Energy)
-            "extreme": "#C0392B"   # Terracotta (Critical)
-        }
-        colors = [color_map.get(z, "#F1C40F") for z in self.metrics_df["vol_zone"]]
+        # UNIFIED REGIME COLOR SYSTEM (uses centralized determine_market_regime)
+        
+        # Pre-calculate criticality score for entire dataframe
+        df_plot = self.metrics_df.copy()
+        
+        # Calculate criticality using rolling volatility percentile
+        vol_window = min(504, len(df_plot) - 1)  # ~2 years lookback
+        df_plot['criticality_score'] = df_plot['volatility'].rolling(
+            window=vol_window, min_periods=30
+        ).apply(
+            lambda x: (x.iloc[-1] <= x).sum() / len(x) * 100 if len(x) > 1 else 50, raw=False
+        )
+        
+        # Apply trend modifiers (same as get_current_market_state)
+        df_plot['trend_modifier'] = 0
+        df_plot.loc[df_plot['close'] < df_plot['sma_200'], 'trend_modifier'] = 10  # Downtrend
+        price_deviation = (df_plot['close'] - df_plot['sma_200']) / df_plot['sma_200'] * 100
+        df_plot.loc[price_deviation > 30, 'trend_modifier'] = 10  # Parabolic
+        
+        # Final criticality with modifiers
+        df_plot['criticality_score'] = (df_plot['criticality_score'] + df_plot['trend_modifier']).clip(0, 100)
+        df_plot['criticality_score'] = df_plot['criticality_score'].fillna(50)
+        
+        # Calculate POINT-IN-TIME volatility percentile (NO LOOK-AHEAD BIAS)
+        # For each day, compare to trailing 252 days (1 year) only
+        def calc_rolling_vola_percentile(series, window=252):
+            """Calculate volatility percentile using rolling window (point-in-time)."""
+            result = []
+            for i in range(len(series)):
+                if i < 30:  # Need minimum data
+                    result.append(50.0)
+                else:
+                    # Look back at window (or all available data if less than window)
+                    lookback_start = max(0, i - window)
+                    historical_vols = series.iloc[lookback_start:i+1]
+                    current_vol = series.iloc[i]
+                    
+                    if len(historical_vols) > 1:
+                        percentile = (historical_vols < current_vol).mean() * 100
+                    else:
+                        percentile = 50.0
+                    result.append(percentile)
+            return result
+        
+        df_plot['vola_percentile'] = calc_rolling_vola_percentile(df_plot['volatility'])
+        
+        def get_color_for_row(row):
+            """Use centralized regime classifier for each bar."""
+            close_price = row['close']
+            sma = row['sma_200']
+            crit = row['criticality_score']
+            vola_pct = row['vola_percentile']  # Now uses point-in-time percentile
+            
+            # Determine trend
+            trend = "UP" if close_price > sma else "DOWN"
+            
+            # Call centralized classifier (Single Source of Truth)
+            regime = determine_market_regime(crit, trend, vola_pct)
+            return regime['color']
+        
+        # Apply colors using centralized logic (no look-ahead bias)
+        colors = [get_color_for_row(row) for _, row in df_plot.iterrows()]
         
         # Volatility bars
         fig3.add_trace(go.Bar(
@@ -1972,6 +2025,103 @@ def calculate_audit_metrics(daily_data: pd.DataFrame, strategy_mode: str = "defe
     }
     
     return audit_report
+
+
+# =============================================================================
+# CENTRALIZED REGIME CLASSIFIER (Single Source of Truth)
+# =============================================================================
+
+def determine_market_regime(criticality: float, trend: str, volatility_percentile: float) -> dict:
+    """
+    SINGLE SOURCE OF TRUTH for market regime classification.
+    
+    This function is used by:
+    - Hero Card display (app.py)
+    - Plot bar colors (logic.py)
+    - Any other UI component
+    
+    STRICT HIERARCHY (Top-Down Priority):
+    1. Trend DOWN → STRUCTURAL DECLINE (Grey)
+    2. Criticality ≥ 80 → CRITICAL INSTABILITY (Red)
+    3. Criticality ≥ 65 OR Volatility > 85% → HIGH ENERGY MANIA (Orange)
+    4. Volatility < 20% → DORMANT STASIS (Green)
+    5. Default → ORGANIC GROWTH (Blue)
+    
+    Args:
+        criticality: Criticality score (0-100), includes trend modifiers
+        trend: 'UP', 'DOWN', 'BULL', 'BEAR', 'FLAT', or 'NEUTRAL'
+        volatility_percentile: Volatility rank (0-100)
+    
+    Returns:
+        Dict with:
+            - name: Regime name (e.g., "CRITICAL INSTABILITY")
+            - color: Hex color code (e.g., "#C0392B")
+            - image_key: Image identifier (e.g., "critical_regime")
+            - icon: Emoji icon (e.g., "🔴")
+    
+    Example:
+        >>> regime = determine_market_regime(75, "UP", 50)
+        >>> print(regime['name'])  # "HIGH ENERGY MANIA"
+        >>> print(regime['color'])  # "#D35400"
+    """
+    crit = float(criticality)
+    vola_p = float(volatility_percentile)
+    trend_upper = str(trend).upper()
+    
+    # Normalize trend to UP/DOWN
+    is_downtrend = trend_upper in ['DOWN', 'BEAR']
+    is_uptrend = trend_upper in ['UP', 'BULL']
+    
+    # === STRICT HIERARCHY (Top-Down) ===
+    
+    # 1. STRUCTURAL DECLINE (Crash/Bear Market) - HIGHEST PRIORITY
+    if is_downtrend:
+        return {
+            'name': 'STRUCTURAL DECLINE',
+            'color': '#7F8C8D',  # Slate Grey
+            'image_key': 'crash_regime',
+            'icon': '⚫',
+            'description': 'Primary Trend is DOWN. Avoid. Cash Position Recommended.'
+        }
+    
+    # 2. CRITICAL INSTABILITY (Extreme Stress)
+    if crit >= 80:
+        return {
+            'name': 'CRITICAL INSTABILITY',
+            'color': '#C0392B',  # Terracotta Red (Magma)
+            'image_key': 'critical_regime',
+            'icon': '🔴',
+            'description': 'Criticality Score ≥ 80 (Extreme stress). Danger. Reduce Position Size immediately.'
+        }
+    
+    # 3. HIGH ENERGY MANIA (Momentum/Overheated)
+    if crit >= 65 or vola_p > 85:
+        return {
+            'name': 'HIGH ENERGY MANIA',
+            'color': '#D35400',  # Pumpkin Orange (Pyrite/Gold)
+            'image_key': 'high_energy_regime',
+            'icon': '🟠',
+            'description': 'Criticality 65-79 or High Volatility. Overheated. Hold with tight Stop-Loss.'
+        }
+    
+    # 4. DORMANT STASIS (Low Variance/Sleep Mode)
+    if vola_p < 20:
+        return {
+            'name': 'DORMANT STASIS',
+            'color': '#27AE60',  # Nephritis Green (Moss)
+            'image_key': 'dormant_regime',
+            'icon': '🟢',
+            'description': 'Low volatility, minimal variance. Waiting. Accumulate or Patience.'
+        }
+    
+    # 5. ORGANIC GROWTH (Healthy Normal) - DEFAULT
+    return {
+        'name': 'ORGANIC GROWTH',
+        'color': '#2980B9',  # Belize Blue (Bismuth)
+        'image_key': 'growth_regime',
+        'icon': '🔵',
+        'description': 'Healthy market structure. Normal parameters. Buy / Hold.'
+    }
 
 
 # =============================================================================

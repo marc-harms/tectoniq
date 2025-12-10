@@ -36,6 +36,7 @@ from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_
 from ui_simulation import render_dca_simulation
 from ui_detail import render_detail_panel, render_regime_persistence_chart, render_current_regime_outlook
 from ui_auth import render_disclaimer, render_auth_page, render_sticky_cockpit_header, render_scientific_masthead, render_education_landing
+from hero_card_visual_v2 import render_hero_specimen
 from auth_manager import (
     is_authenticated, logout, get_current_user_id, get_current_user_email,
     get_user_portfolio, can_access_simulation, show_upgrade_prompt,
@@ -261,109 +262,111 @@ def render_advanced_analytics(df: pd.DataFrame, is_dark: bool = False) -> None:
 
     regime_table.index = [f"{regime_emojis.get(str(r).upper(), '⚪')} {str(r).upper()}" for r in regime_table.index]
     
-    # Display expander
-    with st.expander("Statistical Report & Signal Audit", expanded=False):
-        # Slightly reduce metric value font size to avoid truncation
-        st.markdown(
-            "<style>div[data-testid='stMetricValue'] { font-size: 1.05rem !important; }</style>",
-            unsafe_allow_html=True
+    # Display Statistical Report & Signal Audit (no expander - always visible)
+    st.markdown("### Statistical Report & Signal Audit")
+    st.markdown("<hr style='border: 1px solid #D1C4E9;'>", unsafe_allow_html=True)
+    
+    # Slightly reduce metric value font size to avoid truncation
+    st.markdown(
+        "<style>div[data-testid='stMetricValue'] { font-size: 1.05rem !important; }</style>",
+        unsafe_allow_html=True
+    )
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    
+    with col1:
+        st.markdown("### 📊 Regime Profile")
+        st.dataframe(regime_table, use_container_width=True)
+    
+    with col2:
+        st.markdown("### 🛡️ Protection")
+        st.metric("True Crashes", crash_metrics['total_crashes_5y'], delta=f"{crash_metrics['detected_count']} detected")
+        st.metric(
+            "Detection Rate",
+            f"{crash_metrics['detection_rate']:.0f}%",
+            help="Percentage of crashes (>20% drop) successfully flagged in advance."
         )
-        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-        
-        with col1:
-            st.markdown("### 📊 Regime Profile")
-            st.dataframe(regime_table, use_container_width=True)
-        
-        with col2:
-            st.markdown("### 🛡️ Protection")
-            st.metric("True Crashes", crash_metrics['total_crashes_5y'], delta=f"{crash_metrics['detected_count']} detected")
-            st.metric(
-                "Detection Rate",
-                f"{crash_metrics['detection_rate']:.0f}%",
-                help="Percentage of crashes (>20% drop) successfully flagged in advance."
-            )
-        
-        with col3:
-            st.markdown("### 🎯 Quality")
-            false_alarms = crash_metrics.get('false_alarms', 0)
-            total_signals = crash_metrics.get('total_signals', 0)
-            detected = crash_metrics.get('detected_count', 0)
-            hit_rate_value = f"{detected}/{total_signals}" if total_signals else "0/0"
-            ratio = (total_signals / detected) if detected else None
-            delta_text = f"1 crash per {ratio:.0f} alerts" if ratio else "No detections yet"
+    
+    with col3:
+        st.markdown("### 🎯 Quality")
+        false_alarms = crash_metrics.get('false_alarms', 0)
+        total_signals = crash_metrics.get('total_signals', 0)
+        detected = crash_metrics.get('detected_count', 0)
+        hit_rate_value = f"{detected}/{total_signals}" if total_signals else "0/0"
+        ratio = (total_signals / detected) if detected else None
+        delta_text = f"1 crash per {ratio:.0f} alerts" if ratio else "No detections yet"
 
-            st.metric(
-                "False Alarms",
-                f"{false_alarms}",
-                help="Signals followed by market recovery (Insurance Cost)"
-            )
-            st.metric(
-                "Hit Rate",
-                hit_rate_value,
-                delta=delta_text,
-                help="Detected crashes versus total defensive alerts"
-            )
-        
-        with col4:
-            st.markdown("### ⏱️ Timing")
-            avg_lead = crash_metrics.get('avg_lead_time_days', 0) or 0
-            if avg_lead >= 1.0:
-                lead_display = f"{avg_lead:.1f} Days"
-            elif 0 < avg_lead < 1:
-                lead_display = "< 1 Day"
-            else:
-                lead_display = "Same Day (Reaction)"
-            st.metric(
-                "Ø Lead Time",
-                lead_display,
-                help="Average number of days the signal turned Red/Orange before the crash peak. 'Same Day' indicates the model reacted instantly to a sudden shock event."
-            )
-
-        crash_list = crash_metrics.get('crash_list_full') or crash_metrics.get('crash_list_preview', [])
-        if crash_list:
-            warning_signals = {'CRITICAL', 'HIGH_ENERGY', 'HIGH ENERGY'}
-            index_is_datetime = pd.api.types.is_datetime64_any_dtype(df_work.index)
-            crash_rows = []
-            for crash in crash_list:
-                start_date = crash.get('start_date')
-                drawdown = crash.get('max_loss')
-                duration = crash.get('duration')
-
-                detected = False
-                found_signal = None
-                if start_date is not None and index_is_datetime:
-                    try:
-                        crash_start = pd.to_datetime(start_date)
-                        lookback_start = crash_start - pd.Timedelta(days=21)
-                        lookahead_end = crash_start + pd.Timedelta(days=7)
-                        window = df_work.loc[lookback_start: lookahead_end]
-                        if 'Regime_Clean' in window.columns:
-                            mask = window['Regime_Clean'].isin(warning_signals)
-                            if mask.any():
-                                detected = True
-                                first_idx = window[mask].index[0]
-                                found_signal = window.loc[first_idx, 'Regime_Clean']
-                    except Exception:
-                        detected = False
-
-                signal_label = "Found: None"
-                if found_signal:
-                    found_clean = str(found_signal).upper()
-                    signal_label = f"Found: {regime_emojis.get(found_clean, '⚪')} {found_clean}"
-
-                crash_rows.append({
-                    'Date': start_date.date() if hasattr(start_date, 'date') else start_date,
-                    'Drawdown': f"{drawdown * 100:.1f}%" if pd.notna(drawdown) else "-",
-                    'Duration': f"{duration} days" if pd.notna(duration) else "-",
-                    'Detected?': "✅" if detected else "❌",
-                    'Signal Found?': signal_label
-                })
-
-            crash_log_df = pd.DataFrame(crash_rows)
-            st.markdown("### 🔎 Event Log: Detected vs. Missed Crashes")
-            st.dataframe(crash_log_df, use_container_width=True)
+        st.metric(
+            "False Alarms",
+            f"{false_alarms}",
+            help="Signals followed by market recovery (Insurance Cost)"
+        )
+        st.metric(
+            "Hit Rate",
+            hit_rate_value,
+            delta=delta_text,
+            help="Detected crashes versus total defensive alerts"
+        )
+    
+    with col4:
+        st.markdown("### ⏱️ Timing")
+        avg_lead = crash_metrics.get('avg_lead_time_days', 0) or 0
+        if avg_lead >= 1.0:
+            lead_display = f"{avg_lead:.1f} Days"
+        elif 0 < avg_lead < 1:
+            lead_display = "< 1 Day"
         else:
-            st.info("No crash events identified in the selected window.")
+            lead_display = "Same Day (Reaction)"
+        st.metric(
+            "Ø Lead Time",
+            lead_display,
+            help="Average number of days the signal turned Red/Orange before the crash peak. 'Same Day' indicates the model reacted instantly to a sudden shock event."
+        )
+
+    crash_list = crash_metrics.get('crash_list_full') or crash_metrics.get('crash_list_preview', [])
+    if crash_list:
+        warning_signals = {'CRITICAL', 'HIGH_ENERGY', 'HIGH ENERGY'}
+        index_is_datetime = pd.api.types.is_datetime64_any_dtype(df_work.index)
+        crash_rows = []
+        for crash in crash_list:
+            start_date = crash.get('start_date')
+            drawdown = crash.get('max_loss')
+            duration = crash.get('duration')
+
+            detected = False
+            found_signal = None
+            if start_date is not None and index_is_datetime:
+                try:
+                    crash_start = pd.to_datetime(start_date)
+                    lookback_start = crash_start - pd.Timedelta(days=21)
+                    lookahead_end = crash_start + pd.Timedelta(days=7)
+                    window = df_work.loc[lookback_start: lookahead_end]
+                    if 'Regime_Clean' in window.columns:
+                        mask = window['Regime_Clean'].isin(warning_signals)
+                        if mask.any():
+                            detected = True
+                            first_idx = window[mask].index[0]
+                            found_signal = window.loc[first_idx, 'Regime_Clean']
+                except Exception:
+                    detected = False
+
+            signal_label = "Found: None"
+            if found_signal:
+                found_clean = str(found_signal).upper()
+                signal_label = f"Found: {regime_emojis.get(found_clean, '⚪')} {found_clean}"
+
+            crash_rows.append({
+                'Date': start_date.date() if hasattr(start_date, 'date') else start_date,
+                'Drawdown': f"{drawdown * 100:.1f}%" if pd.notna(drawdown) else "-",
+                'Duration': f"{duration} days" if pd.notna(duration) else "-",
+                'Detected?': "✅" if detected else "❌",
+                'Signal Found?': signal_label
+            })
+
+        crash_log_df = pd.DataFrame(crash_rows)
+        st.markdown("### 🔎 Event Log: Detected vs. Missed Crashes")
+        st.dataframe(crash_log_df, use_container_width=True)
+    else:
+        st.info("No crash events identified in the selected window.")
 
 
 # =============================================================================
@@ -375,6 +378,56 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"  # No sidebar used - user menu in header
 )
+
+# =============================================================================
+# GLOBAL SCIENTIFIC HERITAGE TYPOGRAPHY
+# =============================================================================
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Roboto:wght@300;400;500;700&display=swap');
+    
+    /* Global Background - Paper Texture */
+    .stApp, [data-testid="stAppViewContainer"] {
+        background-color: #F9F7F1 !important;
+    }
+    
+    /* Headers - Merriweather Serif (Scientific Publication Style) */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Merriweather', serif !important;
+        color: #2C3E50 !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.5px !important;
+    }
+    
+    /* Body Text - Roboto Sans-Serif (Clean, Readable) */
+    p, div, span, label, .stMarkdown {
+        font-family: 'Roboto', sans-serif !important;
+        color: #333333 !important;
+    }
+    
+    /* Data Tables - Monospace for Numbers */
+    .stDataFrame, table {
+        font-family: 'Roboto Mono', monospace !important;
+    }
+    
+    /* Metric Labels - Merriweather */
+    [data-testid="stMetricLabel"] {
+        font-family: 'Merriweather', serif !important;
+        color: #555555 !important;
+    }
+    
+    /* Metric Values - Roboto Mono */
+    [data-testid="stMetricValue"] {
+        font-family: 'Roboto Mono', monospace !important;
+        color: #2C3E50 !important;
+    }
+    
+    /* Buttons - Merriweather for elegance */
+    button {
+        font-family: 'Merriweather', serif !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # =============================================================================
 # CONSTANTS
@@ -634,7 +687,7 @@ def run_analysis(tickers: List[str]) -> List[Dict[str, Any]]:
     status = st.empty()
     
     for i, symbol in enumerate(tickers):
-        status.caption(f"Analyzing {symbol}...")
+        status.caption(f"⚡ Calibrating seismic analysis for {symbol}...")
         try:
             df = fetcher.fetch_data(symbol)
             info = fetcher.fetch_info(symbol)
@@ -837,7 +890,7 @@ def show_disclaimer_dialog():
     - All analysis is purely statistical observation
     - Past performance is not indicative of future results
     
-    **Limitation of Liability:**
+    **Limitation of Liabilities:**
     - The creators shall not be liable for any damages arising from use
     - Users accept full responsibility for their investment decisions
     
@@ -1034,7 +1087,7 @@ def main():
                     st.markdown("---")
                     
                     # Fetch full analysis for all portfolio assets (includes crash_warning)
-                    with st.spinner("Loading portfolio data..."):
+                    with st.spinner("🌊 Acquiring seismic market data stream... Analyzing structural stress patterns..."):
                         import time
                         portfolio_analysis = []
                         fetcher = DataFetcher(cache_enabled=True)
@@ -1199,7 +1252,7 @@ def main():
                     st.session_state.current_ticker = ticker
                     
                     # Run analysis
-                    with st.spinner(f"Analyzing {ticker}..."):
+                    with st.spinner(f"🔬 Calibrating Self-Organized Criticality engine for {ticker}... Detecting phase transitions..."):
                         try:
                             results = run_analysis([ticker])
                             if results and len(results) > 0:
@@ -1300,22 +1353,24 @@ def main():
                     # Low criticality - stable growth
                     regime_for_card = "STABLE GROWTH"
 
-                # Render hero card with narrative engine (centered at 50% width)
+                # Render NEW trading card style hero card (centered at 50% width)
                 price_display = f"${price:,.2f}"
                 change_display = f"{change:+.2f}%"
                 
-                col_hero_left, col_hero_center, col_hero_right = st.columns([1, 2, 1])
-                with col_hero_center:
-                    render_hero_card(
-                        ticker=symbol,
-                        asset_name=full_name,
-                        current_price=price_display,
-                        price_change_24h=change_display,
-                        score=int(criticality),
-                        regime_raw=regime_for_card,
-                        trend=trend,
-                        is_invested=is_invested
-                    )
+                # Get volatility percentile from current state for accurate regime classification
+                vol_percentile = current_state.get('raw_data', {}).get('volatility', 0) * 100
+                
+                # Render with new trading card style
+                render_hero_specimen(
+                    ticker=symbol,
+                    asset_name=full_name,
+                    current_price=price_display,
+                    price_change_24h=change_display,
+                    criticality=int(criticality),
+                    trend=trend,
+                    is_invested=is_invested,
+                    volatility_percentile=vol_percentile
+                )
 
                 # === SOC Chart (Plotly) ===
                 if not full_history.empty:

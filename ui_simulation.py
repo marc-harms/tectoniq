@@ -101,7 +101,7 @@ def render_dca_simulation(tickers: List[str]) -> None:
         start_date = (datetime.now() - timedelta(days=years_back * 365)).strftime('%Y-%m-%d')
         
         # === RUN BOTH SIMULATIONS ===
-        with st.spinner(f"Simulating {years_back} years for {sim_ticker} (Defensive + Aggressive)..."):
+        with st.spinner(f"⚙️ Reconstructing {years_back}-year tectonic timeline for {sim_ticker}... Simulating phase transitions..."):
             # Run Defensive simulation
             results_def = run_dca_simulation(
                 sim_ticker, 

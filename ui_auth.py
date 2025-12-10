@@ -280,7 +280,7 @@ def render_auth_page() -> None:
                     if not email or not password:
                         st.error("Please enter both email and password")
                     else:
-                        with st.spinner("Authenticating..."):
+                        with st.spinner("🔐 Authenticating credentials... Establishing secure session..."):
                             success, error, user_data = login(email, password)
                             
                             if success:
@@ -317,7 +317,7 @@ def render_auth_page() -> None:
                     elif not agree_terms:
                         st.error("Please agree to the Terms of Service")
                     else:
-                        with st.spinner("Creating your account..."):
+                        with st.spinner("🔬 Initializing new seismograph profile... Configuring monitoring arrays..."):
                             success, error, user_data = signup(email, password)
                             
                             if success:

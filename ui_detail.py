@@ -248,7 +248,7 @@ def render_detail_panel(result: Dict[str, Any], get_signal_color_func, get_signa
         st.plotly_chart(figs['chart3'], width="stretch")
         
         # Historical Signal Analysis
-        with st.spinner("Analyzing historical signals..."):
+        with st.spinner("🔍 Analyzing historical regime patterns... Mapping stress accumulation trajectories..."):
             analysis = analyzer.get_historical_signal_analysis()
         
         if 'error' in analysis:
