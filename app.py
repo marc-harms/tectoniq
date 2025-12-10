@@ -35,7 +35,7 @@ import plotly.graph_objects as go
 from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_metrics, get_current_market_state
 from ui_simulation import render_dca_simulation
 from ui_detail import render_detail_panel, render_regime_persistence_chart, render_current_regime_outlook
-from ui_auth import render_disclaimer, render_auth_page, render_sticky_cockpit_header, render_scientific_masthead, render_education_landing
+from ui_auth import render_disclaimer, render_auth_page, render_education_landing
 from hero_card_visual_v2 import render_hero_specimen
 from auth_manager import (
     is_authenticated, logout, get_current_user_id, get_current_user_email,
@@ -44,6 +44,247 @@ from auth_manager import (
 )
 from config import get_scientific_heritage_css, HERITAGE_THEME, REGIME_COLORS
 from analytics_engine import MarketForensics
+
+
+# =============================================================================
+# SCIENTIFIC MASTHEAD HEADER
+# =============================================================================
+
+def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
+    """
+    Render Scientific Masthead header with vitals bar, branding, and control deck.
+    
+    Three-tier structure:
+    1. Vitals Bar (dark strip) - Date, Status, User, Logout
+    2. Masthead (branding) - Title, Subtitle, Double Rule
+    3. Control Deck (search & nav) - Search bar + Navigation buttons
+    """
+    from datetime import datetime
+    from auth_manager import get_current_user_email, logout
+    
+    # === VITALS BAR CSS & HTML ===
+    vitals_css = """
+    <style>
+        .vitals-bar {
+            background-color: #2C3E50;
+            color: #ECF0F1 !important;
+            padding: 10px 0;
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.85rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .vitals-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .vitals-left {
+            display: flex;
+            gap: 2rem;
+        }
+        .vitals-right {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .vitals-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #ECF0F1 !important;
+        }
+        .vitals-item span {
+            color: #ECF0F1 !important;
+        }
+        .vitals-item strong {
+            color: #FFFFFF !important;
+        }
+        .status-online {
+            width: 8px;
+            height: 8px;
+            background-color: #27AE60;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+    """
+    
+    # Get current date and user
+    current_date = datetime.now().strftime("%b %d, %Y")
+    user_email = get_current_user_email()
+    user_name = user_email.split('@')[0] if user_email else "User"
+    user_tier = st.session_state.get('tier', 'free')
+    tier_label = "Premium" if user_tier == "premium" else "Free"
+    tier_color = "#FFD700" if user_tier == "premium" else "#95A5A6"
+    
+    vitals_html = f"""
+    {vitals_css}
+    <div class="vitals-bar">
+        <div class="vitals-content">
+            <div class="vitals-left">
+                <div class="vitals-item">
+                    <span>📅 {current_date}</span>
+                </div>
+                <div class="vitals-item">
+                    <span class="status-online"></span>
+                    <span>System Status: <strong>ONLINE</strong></span>
+                </div>
+            </div>
+            <div class="vitals-right">
+                <div class="vitals-item">
+                    <span>Logged in as <strong>{user_name}</strong> <span style="color: {tier_color};">({tier_label})</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    
+    st.markdown(vitals_html, unsafe_allow_html=True)
+    
+    # === MASTHEAD (Branding) ===
+    masthead_css = """
+    <style>
+        .masthead-container {
+            text-align: center;
+            padding: 2rem 0 1.5rem 0;
+            background-color: #F9F7F1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .masthead-title {
+            font-family: 'Merriweather', serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #2C3E50;
+            margin: 0 0 0.5rem 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .masthead-subtitle {
+            font-family: 'Merriweather', serif;
+            font-size: 1.1rem;
+            font-style: italic;
+            color: #555555;
+            margin: 0 0 1.5rem 0;
+        }
+        .masthead-divider {
+            width: 600px;
+            max-width: 90%;
+            border: none;
+            border-top: 3px double #BDC3C7;
+            height: 0;
+            margin: 0;
+        }
+    </style>
+    """
+    
+    masthead_html = """
+    <div class="masthead-container">
+        <div class="masthead-title">TECTONIQ</div>
+        <div class="masthead-subtitle">Algorithmic Market Forensics</div>
+        <hr class="masthead-divider">
+    </div>
+    """
+    
+    st.markdown(masthead_css + masthead_html, unsafe_allow_html=True)
+    
+    # === CONTROL DECK (Search & Nav) ===
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    
+    # Control Deck Layout: Row 1 - Search | Deep Dive | Simulation
+    col_search, col_dive, col_sim = st.columns([3, 1, 1])
+    
+    with col_search:
+        # Clear search field if asset is already selected
+        has_active_asset = 'scan_results' in st.session_state and st.session_state.scan_results
+        if has_active_asset and 'header_search' in st.session_state and st.session_state.header_search:
+            st.session_state.header_search = ""
+        
+        placeholder_text = "Search ticker (e.g., AAPL, BTC-USD) and press Enter"
+        
+        # Search field
+        search_query = st.text_input(
+            "Search Asset",
+            placeholder=placeholder_text,
+            label_visibility="collapsed",
+            key="header_search",
+            on_change=lambda: handle_header_search(
+                st.session_state.get('header_search', ''),
+                validate_ticker_func,
+                search_ticker_func,
+                run_analysis_func
+            )
+        )
+    
+    with col_dive:
+        if st.button("📊 Deep Dive", key="header_btn_deep_dive", use_container_width=True):
+            if 'scan_results' in st.session_state and st.session_state.scan_results:
+                st.session_state.analysis_mode = "deep_dive"
+                st.rerun()
+    
+    with col_sim:
+        if st.button("🎯 Simulation", key="header_btn_simulation", use_container_width=True):
+            if 'scan_results' in st.session_state and st.session_state.scan_results:
+                st.session_state.analysis_mode = "simulation"
+                st.rerun()
+    
+    st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+    
+    # Row 2: News & Updates | Refresh Data (same structure as row 1)
+    col_spacer, col_news, col_refresh = st.columns([3, 1, 1])
+    
+    with col_news:
+        if st.button("🚨 News & Updates", key="header_btn_news", use_container_width=True):
+            show_news_dialog()
+    
+    with col_refresh:
+        if st.button("🔄 Refresh Data", key="header_refresh_btn", use_container_width=True):
+            st.cache_data.clear()
+            if 'data' in st.session_state:
+                del st.session_state['data']
+            if 'scan_results' in st.session_state:
+                del st.session_state['scan_results']
+            st.rerun()
+
+
+def handle_header_search(query: str, validate_func, search_func, analyze_func):
+    """Handle search from header control deck."""
+    if not query or len(query.strip()) == 0:
+        return
+    
+    ticker_input = query.strip().upper()
+    
+    try:
+        validation = validate_func(ticker_input)
+        
+        if validation.get('valid'):
+            results = analyze_func([ticker_input])
+            if results and len(results) > 0:
+                st.session_state.current_ticker = ticker_input
+                st.session_state.scan_results = results
+                st.session_state.selected_asset = 0
+                st.session_state.analysis_mode = "deep_dive"
+                st.session_state.header_search = ""
+        else:
+            search_results = search_func(ticker_input)
+            if search_results:
+                st.session_state.ticker_suggestions = search_results
+            else:
+                st.error(f"Could not find '{ticker_input}'. Try entering the exact ticker symbol.")
+    except Exception as e:
+        st.error(f"Search error: {str(e)}")
 
 
 # =============================================================================
@@ -1055,16 +1296,20 @@ def main():
         render_auth_page()
         return
     
+    # Handle refresh from vitals bar
+    if st.session_state.get('trigger_refresh', False):
+        st.cache_data.clear()
+        if 'data' in st.session_state:
+            del st.session_state['data']
+        if 'scan_results' in st.session_state:
+            del st.session_state['scan_results']
+        st.session_state.trigger_refresh = False
+        st.rerun()
+    
     # === SCIENTIFIC MASTHEAD (Journal-style Header) ===
-    render_scientific_masthead(validate_ticker, search_ticker, run_analysis)
+    render_header(validate_ticker, search_ticker, run_analysis)
     
-    # === NEWS & UPDATES BUTTON (centered) ===
-    col_news_spacer1, col_news_center, col_news_spacer2 = st.columns([2, 1, 2])
-    with col_news_center:
-        if st.button("🚨 News & Updates", key="btn_news_updates", use_container_width=True):
-            show_news_dialog()
-    
-    st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
     # === PORTFOLIO VIEW (if toggled on) ===
     if st.session_state.get('show_portfolio', False):
@@ -1280,33 +1525,6 @@ def main():
     else:
         # CONDITION B: Asset Selected - Show Analysis
         results = st.session_state.scan_results
-        
-        # === ANALYSIS MODE TABS (all in one row) ===
-        col_spacer1, col_tab1, col_tab2, col_spacer2 = st.columns([1, 2, 2, 1])
-        
-        with col_tab1:
-            if st.button(
-                "📊 Asset Deep Dive",
-                key="btn_deep_dive",
-                use_container_width=True
-            ):
-                st.session_state.analysis_mode = "deep_dive"
-                st.rerun()
-        
-        with col_tab2:
-            if st.button(
-                "🎯 Portfolio Simulation",
-                key="btn_simulation",
-                use_container_width=True
-            ):
-                st.session_state.analysis_mode = "simulation"
-                st.rerun()
-        
-        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-        
-        # Active asset card removed - hero card is shown in deep dive section instead
-        
-        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
         
         # === RENDER SELECTED ANALYSIS ===
         if st.session_state.analysis_mode == "deep_dive":
