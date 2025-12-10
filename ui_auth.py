@@ -429,8 +429,8 @@ def render_scientific_masthead(validate_ticker_func: Callable, search_ticker_fun
     </style>
     """, unsafe_allow_html=True)
     
-    # === LEVEL 1: UTILITY BAR (User info + Logout) ===
-    col_spacer, col_utility = st.columns([3, 1])
+    # === LEVEL 1: UTILITY BAR (User info + Logout + Refresh) ===
+    col_spacer, col_utility = st.columns([2.5, 1.5])
     
     with col_utility:
         user_email = get_current_user_email()
@@ -443,10 +443,27 @@ def render_scientific_masthead(validate_ticker_func: Callable, search_ticker_fun
         </div>
         """, unsafe_allow_html=True)
         
-        if st.button("Logout", key="masthead_logout_btn", use_container_width=True):
-            logout()
-            st.success("Logged out!")
-            st.rerun()
+        col_refresh, col_logout = st.columns(2)
+        with col_refresh:
+            if st.button("🔄 Refresh", key="masthead_refresh_btn", use_container_width=True, 
+                        help="Clear cache and reload data"):
+                # Clear Streamlit cache
+                st.cache_data.clear()
+                # Clear session state data cache
+                if 'data' in st.session_state:
+                    del st.session_state['data']
+                if 'data_symbol' in st.session_state:
+                    del st.session_state['data_symbol']
+                if 'scan_results' in st.session_state:
+                    del st.session_state['scan_results']
+                st.success("✅ Cache cleared! Data will refresh on next search.")
+                st.rerun()
+        
+        with col_logout:
+            if st.button("Logout", key="masthead_logout_btn", use_container_width=True):
+                logout()
+                st.success("Logged out!")
+                st.rerun()
     
     # === LEVEL 2: IDENTITY (Logo + Title + Narrative) ===
     st.markdown("""

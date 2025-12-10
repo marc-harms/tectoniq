@@ -32,7 +32,7 @@ import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 
-from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_metrics
+from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_metrics, get_current_market_state
 from ui_simulation import render_dca_simulation
 from ui_detail import render_detail_panel, render_regime_persistence_chart, render_current_regime_outlook
 from ui_auth import render_disclaimer, render_auth_page, render_sticky_cockpit_header, render_scientific_masthead, render_education_landing
@@ -54,10 +54,11 @@ import pandas as pd
 import numpy as np
 import textwrap
 
-def generate_market_narrative(regime_raw: str, trend: str, score: float, change_24h: float) -> str:
+def generate_market_narrative(regime_raw: str, trend: str, score: float, change_24h: float, is_invested: bool = True) -> str:
     """
     Generates a concise one-sentence market narrative for the hero card.
     Combines regime context, price trend and 24h move into a short insight.
+    Now also considers investment status from get_current_market_state().
     """
     try:
         change_val = float(change_24h)
@@ -66,6 +67,11 @@ def generate_market_narrative(regime_raw: str, trend: str, score: float, change_
 
     regime = str(regime_raw).upper()
 
+    # PROTECTIVE STASIS: Algorithm has decoupled from market (not invested)
+    if not is_invested or "PROTECTIVE" in regime or "STASIS" in regime:
+        base = "Algorithm has decoupled from market volatility. Capital is protected"
+        return f"{base}."
+
     # Basis-Satz basierend auf Regime (Zustand)
     if "CRITICAL" in regime:
         base = "The market is showing signs of systemic instability and extreme stress"
@@ -73,7 +79,7 @@ def generate_market_narrative(regime_raw: str, trend: str, score: float, change_
         base = "Volatility is surging, indicating an overheated market state"
     elif "ACTIVE" in regime:
         base = "Trading activity is normal with healthy liquidity"
-    elif "STABLE" in regime:
+    elif "STABLE" in regime or "GROWTH" in regime:
         base = "The asset is in a calm, low-volatility accumulation phase"
     elif "DORMANT" in regime:
         base = "Market participation is minimal; the asset is currently asleep"
@@ -85,9 +91,9 @@ def generate_market_narrative(regime_raw: str, trend: str, score: float, change_
         direction = ", accompanied by sharp selling pressure."
     elif change_val > 2.0:
         direction = ", driven by strong buying momentum."
-    elif str(trend).upper() == "UP":
+    elif str(trend).upper() == "UP" or str(trend).upper() == "BULL":
         direction = ", supporting a steady upward trend."
-    elif str(trend).upper() == "DOWN":
+    elif str(trend).upper() == "DOWN" or str(trend).upper() == "BEAR":
         direction = ", weighing down on price action."
     else:
         direction = "."
@@ -102,10 +108,12 @@ def render_hero_card(
     price_change_24h: str,
     score: float,
     regime_raw: str,
-    trend: str = "Unknown"
+    trend: str = "Unknown",
+    is_invested: bool = True
 ) -> None:
     """
     Renders the Asset Hero Card (Specimen Label Style) with narrative engine.
+    Now uses get_current_market_state() to determine visual theme.
     """
     # 1) Parse percent text for logic
     try:
@@ -113,18 +121,23 @@ def render_hero_card(
     except Exception:
         pct_val = 0.0
 
-    narrative = generate_market_narrative(regime_raw, trend, score, pct_val)
+    narrative = generate_market_narrative(regime_raw, trend, score, pct_val, is_invested)
 
-    # 2) Regime badge color + label
+    # 2) Regime badge color + label - based on investment state
     regime_upper = str(regime_raw).upper()
-    if "CRITICAL" in regime_upper:
+    
+    # PROTECTIVE STASIS: Not invested (algorithm decoupled from market)
+    if not is_invested or "PROTECTIVE" in regime_upper or "STASIS" in regime_upper:
+        badge_color = "#95A5A6"  # Fossil Grey (Dormant theme)
+        clean_regime = "PROTECTIVE STASIS"
+    elif "CRITICAL" in regime_upper:
         badge_color = "#C0392B"; clean_regime = "CRITICAL"
     elif "HIGH" in regime_upper:
         badge_color = "#D35400"; clean_regime = "HIGH ENERGY"
     elif "ACTIVE" in regime_upper:
         badge_color = "#F1C40F"; clean_regime = "ACTIVE"
-    elif "STABLE" in regime_upper:
-        badge_color = "#27AE60"; clean_regime = "STABLE"
+    elif "STABLE" in regime_upper or "GROWTH" in regime_upper:
+        badge_color = "#27AE60"; clean_regime = "STABLE GROWTH"
     else:
         badge_color = "#95A5A6"; clean_regime = "DORMANT"
 
@@ -886,9 +899,9 @@ def show_imprint_dialog():
     st.markdown("""
     **Service Provider:**  
     TECTONIQ Platform  
-    [Your Address]  
-    [City, Postal Code]  
-    [Country]
+    Havelweg 12
+    Moers, 47445 
+    Germany
     
     **Contact:**  
     Email: info@tectoniq.app  
@@ -1254,9 +1267,6 @@ def main():
                 full_name = selected.get('info', {}).get('longName', name)
                 price = selected.get('price', 0.0)
                 change = selected.get('price_change_1d', selected.get('change_pct', 0.0))
-                trend = selected.get('trend', 'Unknown')
-                criticality = int(selected.get('criticality_score', 0))
-                signal = selected.get('signal', 'Unknown')
 
                 is_dark = st.session_state.get('dark_mode', False)
                 fetcher = DataFetcher(cache_enabled=True)
@@ -1267,14 +1277,28 @@ def main():
                     st.session_state['data'] = full_history
                     st.session_state['data_symbol'] = symbol
 
-                # Prefer latest regime from history if available for narrative
-                regime_for_card = signal or "Unknown"
-                if full_history is not None and not full_history.empty:
-                    regime_col = next((c for c in ['Regime', 'regime'] if c in full_history.columns), None)
-                    if regime_col:
-                        reg_series = full_history[regime_col].astype(str)
-                        if len(reg_series):
-                            regime_for_card = reg_series.iloc[-1]
+                # === GET CURRENT MARKET STATE (matches backtest tail) ===
+                # This ensures Hero Card visually matches the end of the performance chart
+                current_state = get_current_market_state(full_history, strategy_mode="defensive")
+                
+                # Map state to visual theme
+                is_invested = current_state.get('is_invested', True)
+                criticality = current_state.get('criticality_score', 0)
+                trend = current_state.get('trend_signal', 'Unknown')
+                
+                # Determine regime display based on investment state and criticality
+                if not is_invested:
+                    # Algorithm has decoupled - show PROTECTIVE STASIS
+                    regime_for_card = "PROTECTIVE STASIS"
+                elif criticality > 80:
+                    # High criticality while invested
+                    regime_for_card = "CRITICAL"
+                elif criticality > 60:
+                    # Medium criticality
+                    regime_for_card = "HIGH ENERGY"
+                else:
+                    # Low criticality - stable growth
+                    regime_for_card = "STABLE GROWTH"
 
                 # Render hero card with narrative engine (centered at 50% width)
                 price_display = f"${price:,.2f}"
@@ -1287,9 +1311,10 @@ def main():
                         asset_name=full_name,
                         current_price=price_display,
                         price_change_24h=change_display,
-                        score=criticality,
+                        score=int(criticality),
                         regime_raw=regime_for_card,
-                        trend=trend
+                        trend=trend,
+                        is_invested=is_invested
                     )
 
                 # === SOC Chart (Plotly) ===

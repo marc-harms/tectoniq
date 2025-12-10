@@ -397,6 +397,13 @@ class SOCAnalyzer:
         current_vol = self.metrics_df["volatility"].iloc[-1]
         vol_percentile = self.summary_stats.get("current_vol_percentile", 50)
         
+        # Calculate 24h (1-day) price change percentage
+        price_change_1d = 0.0
+        if len(self.metrics_df) >= 2:
+            prev_price = self.metrics_df["close"].iloc[-2]
+            if prev_price > 0:
+                price_change_1d = ((current_price - prev_price) / prev_price) * 100
+        
         # Thresholds (5-tier)
         vol_low = self.calculator.vol_low_threshold
         vol_medium = self.calculator.vol_medium_threshold
@@ -498,6 +505,7 @@ class SOCAnalyzer:
         return {
             "symbol": self.symbol,
             "price": current_price,
+            "price_change_1d": price_change_1d,  # 24h price change percentage
             "sma_200": sma_200,
             "dist_to_sma": sma_distance_pct / 100,  # As decimal
             "dist_to_sma_pct": sma_distance_pct,
@@ -1964,6 +1972,197 @@ def calculate_audit_metrics(daily_data: pd.DataFrame, strategy_mode: str = "defe
     }
     
     return audit_report
+
+
+# =============================================================================
+# CURRENT MARKET STATE (Real-time Query)
+# =============================================================================
+
+def get_current_market_state(df: pd.DataFrame, strategy_mode: str = "defensive") -> Dict[str, Any]:
+    """
+    Get the current market state (TODAY) using EXACT same logic as DynamicExposureSimulator.
+    
+    This function applies the identical rules used in the backtesting loop to determine
+    whether we should be invested or in cash RIGHT NOW. It replicates the preparation,
+    calculation, and exposure logic without running a full historical simulation.
+    
+    CRITICAL: This function must produce results that are 1:1 identical to what the
+    backtesting simulation shows for the latest data point. If the backtest shows
+    flat line (cash), this MUST return is_invested=False.
+    
+    Args:
+        df: DataFrame with OHLCV data (must have 'close' column)
+        strategy_mode: "defensive" or "aggressive" (matches simulation modes)
+            - Defensive: Max safety (Red=20%, Orange=50%, Bear=0%)
+            - Aggressive: Max return (Red=50%, Orange=100%, Bear=0%)
+    
+    Returns:
+        Dictionary with:
+        - is_invested (bool): Should we be in the market or cash? (exposure > 0)
+        - criticality_score (float): Current SOC score (0-100)
+        - regime (str): 'RISK_OFF (Cash)' or 'RISK_ON (Full/Partial/Minimal)'
+        - trend_signal (str): 'BULL' (above SMA200), 'BEAR' (below SMA200)
+        - exposure_pct (float): Percentage to invest (0-100)
+        - raw_data (dict): Underlying metrics for debugging/transparency
+    
+    Example:
+        >>> df = yf.download("AAPL", period="2y")
+        >>> state = get_current_market_state(df, strategy_mode="defensive")
+        >>> if state['is_invested']:
+        >>>     print(f"Currently invested at {state['exposure_pct']:.0f}%")
+        >>> else:
+        >>>     print("Currently in cash (RISK_OFF)")
+    """
+    # === INPUT VALIDATION ===
+    if df is None or df.empty:
+        return {
+            'is_invested': False,
+            'criticality_score': 0.0,
+            'regime': 'RISK_OFF (Cash)',
+            'trend_signal': 'UNKNOWN',
+            'exposure_pct': 0.0,
+            'error': 'Empty dataframe'
+        }
+    
+    if 'close' not in df.columns:
+        return {
+            'is_invested': False,
+            'criticality_score': 0.0,
+            'regime': 'RISK_OFF (Cash)',
+            'trend_signal': 'UNKNOWN',
+            'exposure_pct': 0.0,
+            'error': 'Missing close column'
+        }
+    
+    # === STEP 1: APPLY EXACT SAME PREPARATION AS DynamicExposureSimulator._prepare_data() ===
+    work_df = df.copy()
+    
+    # Calculate SMA200
+    work_df['sma_200'] = work_df['close'].rolling(window=200).mean()
+    
+    # Calculate returns and volatility
+    work_df['returns'] = work_df['close'].pct_change()
+    work_df['volatility'] = work_df['returns'].rolling(window=30).std()
+    
+    # Drop NaN rows (required for valid calculations)
+    work_df = work_df.dropna(subset=['close', 'sma_200', 'volatility'])
+    
+    if len(work_df) < 30:
+        return {
+            'is_invested': False,
+            'criticality_score': 0.0,
+            'regime': 'RISK_OFF (Cash)',
+            'trend_signal': 'UNKNOWN',
+            'exposure_pct': 0.0,
+            'error': 'Insufficient data after cleaning (need 200+ days)'
+        }
+    
+    # === STEP 2: CALCULATE CRITICALITY SCORE (Rolling Volatility Percentile) ===
+    vol_window = min(504, len(work_df) - 1)  # ~2 years lookback
+    work_df['criticality_score'] = work_df['volatility'].rolling(
+        window=vol_window, min_periods=30
+    ).apply(
+        lambda x: (x.iloc[-1] <= x).sum() / len(x) * 100, raw=False
+    )
+    
+    # === STEP 3: APPLY TREND MODIFIER (Penalize downtrends and parabolic moves) ===
+    work_df['trend_modifier'] = 0
+    # Downtrend (below SMA200): +10 to criticality (higher perceived risk)
+    work_df.loc[work_df['close'] < work_df['sma_200'], 'trend_modifier'] = 10
+    
+    # Parabolic extension (>30% above SMA): +10 to criticality (overextension risk)
+    price_deviation = (work_df['close'] - work_df['sma_200']) / work_df['sma_200'] * 100
+    work_df.loc[price_deviation > 30, 'trend_modifier'] = 10
+    
+    # Apply modifier and clamp to 0-100
+    work_df['criticality_score'] = (work_df['criticality_score'] + work_df['trend_modifier']).clip(0, 100)
+    work_df['criticality_score'] = work_df['criticality_score'].fillna(50)
+    
+    # === STEP 4: DETERMINE TREND (Uptrend = Price > SMA200) ===
+    work_df['is_uptrend'] = work_df['close'] > work_df['sma_200']
+    
+    # === STEP 5: EXTRACT LATEST (CURRENT) DATA POINT ===
+    latest = work_df.iloc[-1]
+    
+    current_price = latest['close']
+    current_sma = latest['sma_200']
+    criticality_score = latest['criticality_score']
+    is_uptrend = latest['is_uptrend']
+    current_volatility = latest['volatility']
+    
+    # === STEP 6: DETERMINE TREND SIGNAL ===
+    if is_uptrend:
+        trend_signal = 'BULL'
+    else:
+        trend_signal = 'BEAR'
+    
+    # === STEP 7: CALCULATE EXPOSURE (EXACT REPLICA OF SIMULATOR LOGIC) ===
+    is_aggressive = strategy_mode.lower() == "aggressive"
+    
+    # Thresholds (must match DynamicExposureSimulator.run_simulation() exactly)
+    high_stress_threshold = 80  # Critical/Red (>80)
+    medium_stress_threshold = 60  # High Energy/Orange (60-80)
+    
+    # Exposure rules by strategy mode (MUST match simulator)
+    if is_aggressive:
+        # AGGRESSIVE MODE: Ride momentum, reduce only at extremes
+        high_stress_exposure = 0.5    # Red/Critical: 50%
+        medium_stress_exposure = 1.0   # Orange/High Energy: 100% (ride it!)
+        bear_market_exposure = 0.0     # Bear: 0% (hard exit)
+    else:
+        # DEFENSIVE MODE: Max safety, protect capital
+        high_stress_exposure = 0.2     # Red/Critical: 20%
+        medium_stress_exposure = 0.5   # Orange/High Energy: 50%
+        bear_market_exposure = 0.0     # Bear: 0%
+    
+    # Apply exposure calculation (exact replica of calc_exposure in run_simulation)
+    if not is_uptrend:
+        exposure = bear_market_exposure  # Bear market = cash
+    elif criticality_score > high_stress_threshold:
+        exposure = high_stress_exposure  # Red/Critical
+    elif criticality_score > medium_stress_threshold:
+        exposure = medium_stress_exposure  # Orange/High Energy
+    else:
+        exposure = 1.0  # Green/Stable = 100% invested
+    
+    # === STEP 8: DETERMINE INVESTMENT STATUS ===
+    is_invested = exposure > 0.0
+    
+    # === STEP 9: DETERMINE REGIME LABEL ===
+    if is_invested:
+        if exposure >= 1.0:
+            regime = 'RISK_ON (Full)'
+        elif exposure >= 0.5:
+            regime = 'RISK_ON (Partial)'
+        else:
+            regime = 'RISK_ON (Minimal)'
+    else:
+        regime = 'RISK_OFF (Cash)'
+    
+    # === STEP 10: RETURN STRUCTURED RESULT ===
+    return {
+        # Core outputs
+        'is_invested': bool(is_invested),
+        'criticality_score': float(criticality_score),
+        'regime': regime,
+        'trend_signal': trend_signal,
+        'exposure_pct': float(exposure * 100),
+        
+        # Raw data for debugging/transparency
+        'raw_data': {
+            'current_price': float(current_price),
+            'sma_200': float(current_sma),
+            'is_uptrend': bool(is_uptrend),
+            'volatility': float(current_volatility),
+            'price_deviation_pct': float((current_price - current_sma) / current_sma * 100) if current_sma > 0 else 0,
+            'strategy_mode': strategy_mode,
+            'high_stress_threshold': high_stress_threshold,
+            'medium_stress_threshold': medium_stress_threshold,
+            'high_stress_exposure': high_stress_exposure * 100,
+            'medium_stress_exposure': medium_stress_exposure * 100,
+            'bear_market_exposure': bear_market_exposure * 100
+        }
+    }
 
 
 # =============================================================================
