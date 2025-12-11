@@ -35,21 +35,61 @@ def get_supabase_client() -> Client:
     
     Raises:
         KeyError: If SUPABASE_URL or SUPABASE_KEY not found in secrets
+        ValueError: If secrets are not properly configured
     """
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    client = create_client(url, key)
-    
-    # Restore authenticated session if exists
-    if 'supabase_session' in st.session_state:
-        try:
-            session = st.session_state['supabase_session']
-            # Set the session on the client
-            client.auth.set_session(session.access_token, session.refresh_token)
-        except Exception as e:
-            print(f"Warning: Could not restore session: {e}")
-    
-    return client
+    try:
+        # Check if secrets exist
+        if not hasattr(st, 'secrets') or 'SUPABASE_URL' not in st.secrets or 'SUPABASE_KEY' not in st.secrets:
+            error_msg = """
+            🚨 **Supabase Configuration Missing!**
+            
+            Please create `.streamlit/secrets.toml` with your Supabase credentials:
+            
+            ```toml
+            [default]
+            SUPABASE_URL = "https://your-project.supabase.co"
+            SUPABASE_KEY = "your-anon-key-here"
+            ```
+            
+            **How to get these:**
+            1. Go to your Supabase dashboard
+            2. Click: Settings → API
+            3. Copy "Project URL" → SUPABASE_URL
+            4. Copy "anon public" key → SUPABASE_KEY
+            
+            See `.streamlit/secrets.toml.template` for an example.
+            """
+            st.error(error_msg)
+            raise ValueError("Supabase credentials not configured")
+        
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        
+        # Validate they're not template values
+        if "your-project" in url.lower() or "your-actual" in key.lower():
+            st.error("⚠️ **Please update secrets.toml with your actual Supabase credentials!**")
+            raise ValueError("Supabase credentials are still template values")
+        
+        client = create_client(url, key)
+        
+        # Restore authenticated session if exists
+        if 'supabase_session' in st.session_state:
+            try:
+                session = st.session_state['supabase_session']
+                # Set the session on the client
+                client.auth.set_session(session.access_token, session.refresh_token)
+            except Exception as e:
+                print(f"Warning: Could not restore session: {e}")
+        
+        return client
+        
+    except KeyError as e:
+        st.error(f"🚨 **Missing Supabase configuration:** {e}")
+        st.info("Please create `.streamlit/secrets.toml` with SUPABASE_URL and SUPABASE_KEY")
+        raise
+    except Exception as e:
+        st.error(f"🚨 **Supabase connection error:** {str(e)}")
+        raise
 
 
 # =============================================================================
@@ -81,17 +121,27 @@ def signup(email: str, password: str) -> Tuple[bool, Optional[str], Optional[Dic
             "password": password
         })
         
-        if response.user and response.session:
-            # Store the authenticated session in session_state
-            st.session_state['supabase_session'] = response.session
+        if response.user:
+            # User created successfully
+            user_id = response.user.id
+            user_email = response.user.email
+            
+            # Check if email confirmation is required
+            if response.session:
+                # Auto-login enabled (no email confirmation required)
+                st.session_state['supabase_session'] = response.session
+            else:
+                # Email confirmation required - user must check their inbox
+                pass
             
             # Profile is automatically created by database trigger
-            # Just return user data
-            return True, None, {
-                "id": response.user.id,
-                "email": response.user.email,
+            # Return user data
+            user_data = {
+                "id": user_id,
+                "email": user_email,
                 "tier": "free"
             }
+            return True, None, user_data
         else:
             return False, "Failed to create user account", None
             
@@ -99,11 +149,10 @@ def signup(email: str, password: str) -> Tuple[bool, Optional[str], Optional[Dic
         # Import traceback for better error logging
         import traceback
         error_msg = str(e)
-        full_error = traceback.format_exc()
         
-        # Print full error to console for debugging
-        print(f"❌ SIGNUP ERROR: {error_msg}")
-        print(f"Full traceback:\n{full_error}")
+        # Log to console for debugging
+        print(f"[SIGNUP] ERROR: {error_msg}")
+        print(traceback.format_exc())
         
         # User-friendly error messages
         if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
@@ -149,16 +198,23 @@ def login(email: str, password: str) -> Tuple[bool, Optional[str], Optional[Dict
             # Fetch user profile to get tier
             profile = get_user_profile(response.user.id)
             
-            return True, None, {
+            user_data = {
                 "id": response.user.id,
                 "email": response.user.email,
                 "tier": profile.get("subscription_tier", "free") if profile else "free"
             }
+            return True, None, user_data
         else:
             return False, "Invalid email or password", None
             
     except Exception as e:
+        import traceback
         error_msg = str(e)
+        
+        # Log to console for debugging
+        print(f"[LOGIN] ERROR: {error_msg}")
+        print(traceback.format_exc())
+        
         if "invalid" in error_msg.lower() or "credentials" in error_msg.lower():
             return False, "Invalid email or password", None
         else:

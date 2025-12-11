@@ -66,30 +66,34 @@ def render_dca_simulation(tickers: List[str]) -> None:
         )
     
     with col2:
-        years_back = st.selectbox(
-            "Simulation Period:",
-            options=[3, 5, 7, 10, 15],
-            index=2,
-            format_func=lambda x: f"{x} Years"
+        years_back = st.slider(
+            "Simulation Period (Years):",
+            min_value=1,
+            max_value=10,
+            value=7,
+            step=1,
+            format="%d Years"
         )
     
-    # Reality Settings (Fees & Interest)
-    with st.expander("Reality Settings - Fees and Interest", expanded=False):
-        col_fee, col_interest = st.columns(2)
-        
-        with col_fee:
-            trading_fee_pct = st.slider(
-                "Trading Fee & Slippage (%):",
-                min_value=0.0, max_value=2.0, value=0.5, step=0.1,
-                format="%.1f%%"
-            )
-        
-        with col_interest:
-            interest_rate_annual = st.slider(
-                "Interest on Cash (% p.a.):",
-                min_value=0.0, max_value=5.0, value=3.0, step=0.5,
-                format="%.1f%%"
-            )
+    # Reality Settings (Fees & Interest) - Always visible
+    st.markdown("#### Reality Settings")
+    st.caption("Adjust trading costs and cash interest for realistic simulation")
+    
+    col_fee, col_interest = st.columns(2)
+    
+    with col_fee:
+        trading_fee_pct = st.slider(
+            "Trading Fee & Slippage (%):",
+            min_value=0.0, max_value=2.0, value=0.5, step=0.1,
+            format="%.1f%%"
+        )
+    
+    with col_interest:
+        interest_rate_annual = st.slider(
+            "Interest on Cash (% p.a.):",
+            min_value=0.0, max_value=5.0, value=3.0, step=0.5,
+            format="%.1f%%"
+        )
     
     # Run simulation button - centered and smaller
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
@@ -98,6 +102,9 @@ def render_dca_simulation(tickers: List[str]) -> None:
         run_clicked = st.button("Run Simulation", use_container_width=True)
     
     if run_clicked:
+        # Set flag for PLG rate limiting (registered in app.py)
+        st.session_state.simulation_running = True
+        
         start_date = (datetime.now() - timedelta(days=years_back * 365)).strftime('%Y-%m-%d')
         
         # === RUN BOTH SIMULATIONS ===

@@ -10,7 +10,7 @@ Features:
     - Deep dive analysis with historical signal performance
     - Instability Score indicator (0-100)
     - Lump Sum investment simulation with Dynamic Position Sizing
-    - Dark/Light theme support
+    - Product-Led Growth tiered access (Public / Free / Premium)
 
 Theory:
     Markets exhibit Self-Organized Criticality - they naturally evolve toward
@@ -18,14 +18,16 @@ Theory:
     This app visualizes market "energy states" through volatility clustering.
 
 Author: Market Analysis Team
-Version: 6.0 (Cleaned & Documented)
+Version: 1.2 (PLG Implementation)
 """
 
 # =============================================================================
 # IMPORTS
 # =============================================================================
 import requests
+import time
 from typing import List, Dict, Any
+from datetime import datetime, timedelta
 
 import streamlit as st
 import yfinance as yf
@@ -35,7 +37,7 @@ import plotly.graph_objects as go
 from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_metrics, get_current_market_state
 from ui_simulation import render_dca_simulation
 from ui_detail import render_detail_panel, render_regime_persistence_chart, render_current_regime_outlook
-from ui_auth import render_disclaimer, render_auth_page, render_education_landing
+from ui_auth import render_disclaimer, render_login_dialog, render_signup_dialog, render_education_landing
 from hero_card_visual_v2 import render_hero_specimen
 from auth_manager import (
     is_authenticated, logout, get_current_user_id, get_current_user_email,
@@ -44,6 +46,207 @@ from auth_manager import (
 )
 from config import get_scientific_heritage_css, HERITAGE_THEME, REGIME_COLORS
 from analytics_engine import MarketForensics
+
+
+# =============================================================================
+# PRODUCT-LED GROWTH: AUTHENTICATION & RATE LIMITING
+# =============================================================================
+
+def check_rate_limit(action_type: str, limit_per_hour: int) -> bool:
+    """
+    Check if user has exceeded rate limit for a specific action.
+    
+    Uses session state to track action timestamps and enforce hourly limits.
+    Automatically cleans up timestamps older than 1 hour.
+    
+    Args:
+        action_type: Action identifier (e.g., 'search', 'simulation')
+        limit_per_hour: Maximum allowed actions per hour
+    
+    Returns:
+        True if action is allowed, False if limit exceeded
+    """
+    # Initialize rate limit tracking
+    if 'rate_limits' not in st.session_state:
+        st.session_state.rate_limits = {}
+    
+    if action_type not in st.session_state.rate_limits:
+        st.session_state.rate_limits[action_type] = []
+    
+    # Clean up old timestamps (older than 1 hour)
+    current_time = time.time()
+    one_hour_ago = current_time - 3600
+    st.session_state.rate_limits[action_type] = [
+        ts for ts in st.session_state.rate_limits[action_type]
+        if ts > one_hour_ago
+    ]
+    
+    # Check if limit exceeded
+    action_count = len(st.session_state.rate_limits[action_type])
+    return action_count < limit_per_hour
+
+
+def register_action(action_type: str) -> None:
+    """
+    Register that an action was performed (for rate limiting).
+    
+    Args:
+        action_type: Action identifier (e.g., 'search', 'simulation')
+    """
+    if 'rate_limits' not in st.session_state:
+        st.session_state.rate_limits = {}
+    
+    if action_type not in st.session_state.rate_limits:
+        st.session_state.rate_limits[action_type] = []
+    
+    st.session_state.rate_limits[action_type].append(time.time())
+
+
+def get_remaining_actions(action_type: str, limit_per_hour: int) -> int:
+    """Get number of remaining actions in current hour."""
+    if 'rate_limits' not in st.session_state:
+        return limit_per_hour
+    
+    if action_type not in st.session_state.rate_limits:
+        return limit_per_hour
+    
+    # Clean old timestamps
+    current_time = time.time()
+    one_hour_ago = current_time - 3600
+    recent_actions = [ts for ts in st.session_state.rate_limits[action_type] if ts > one_hour_ago]
+    
+    return max(0, limit_per_hour - len(recent_actions))
+
+
+# Authentication functions moved to auth_manager.py
+# Real Supabase authentication is now used (no more demo credentials)
+    # Clear rate limits on logout
+    if 'rate_limits' in st.session_state:
+        st.session_state.rate_limits = {}
+
+
+def render_sidebar_login() -> None:
+    """
+    Render login/status sidebar using real Supabase authentication.
+    
+    Shows login/signup prompts for unauthenticated users, status for authenticated users.
+    """
+    from auth_manager import is_authenticated, get_current_user_email, logout as auth_logout
+    
+    with st.sidebar:
+        st.markdown("### 🔐 Account")
+        
+        if not is_authenticated():
+            # Not logged in - show signup/login prompts
+            st.markdown("**Welcome!** 👋")
+            st.caption("Access all features with a free account")
+            
+            col_login, col_signup = st.columns(2)
+            with col_login:
+                if st.button("🔐 Login", use_container_width=True):
+                    st.session_state.show_login_dialog = True
+                    st.rerun()
+            
+            with col_signup:
+                if st.button("📝 Sign Up", use_container_width=True, type="primary"):
+                    st.session_state.show_signup_dialog = True
+                    st.rerun()
+            
+            st.markdown("---")
+            st.markdown("**With a Free Account:**")
+            st.caption("✅ Unlimited ticker searches")
+            st.caption("✅ Hero Card analysis")
+            st.caption("✅ Portfolio watchlist")
+            st.caption("✅ 3 simulations/hour")
+            
+            st.markdown("---")
+            st.markdown("**Premium Features:**")
+            st.caption("⭐ Deep Dive analysis")
+            st.caption("⭐ Unlimited simulations")
+            st.caption("⭐ Advanced alerts")
+            
+        else:
+            # Logged in - show user status
+            user_email = get_current_user_email()
+            tier = st.session_state.get('tier', 'free')
+            tier_upper = tier.upper()
+            
+            if tier == "premium":
+                tier_emoji = "⭐"
+                tier_color = "#FFD700"
+            elif tier == "free":
+                tier_emoji = "🆓"
+                tier_color = "#27AE60"
+            else:
+                tier_emoji = "👤"
+                tier_color = "#95A5A6"
+            
+            # Display user info
+            st.markdown(f"**{user_email.split('@')[0] if user_email else 'User'}**")
+            st.markdown(f"**Tier:** {tier_emoji} <span style='color: {tier_color}; font-weight: 700;'>{tier_upper}</span>", unsafe_allow_html=True)
+            
+            # Show usage limits
+            st.markdown("---")
+            st.markdown("**Current Usage:**")
+            
+            if tier == "free":
+                sim_remaining = get_remaining_actions('simulation', 3)
+                st.caption(f"🎯 Simulations: {sim_remaining}/3 per hour")
+                st.caption(f"🔍 Searches: Unlimited")
+            else:  # premium
+                st.caption("✨ All features unlimited")
+            
+            # Logout button
+            st.markdown("---")
+            if st.button("🚪 Logout", use_container_width=True):
+                auth_logout()
+                st.success("Logged out successfully!")
+                st.rerun()
+            
+            # Upgrade prompt for non-premium
+            if tier != "premium":
+                st.markdown("---")
+                st.markdown("### ⭐ Upgrade to Premium")
+                st.caption("Unlock Deep Dive + Unlimited simulations")
+                
+                if st.button("💳 View Plans", use_container_width=True):
+                    st.info("💡 Premium plans coming soon! Contact support@tectoniq.app")
+
+
+def show_upgrade_dialog(feature_name: str, tier: str):
+    """
+    Show upgrade dialog for gated features.
+    
+    Args:
+        feature_name: Name of the locked feature
+        tier: Current user tier
+    """
+    from auth_manager import is_authenticated
+    
+    st.warning(f"🔒 **{feature_name}** requires a higher tier.")
+    
+    if not is_authenticated():
+        st.markdown("""
+        **Create a Free account to unlock:**
+        - ✅ Unlimited ticker searches
+        - ✅ Basic Hero Card analysis  
+        - ✅ 3 simulations per hour
+        """)
+        
+        if st.button("📝 Sign Up Now", use_container_width=True, type="primary"):
+            st.session_state.show_signup_dialog = True
+            st.rerun()
+            
+    elif tier == "free":
+        st.markdown("""
+        **Upgrade to Premium to unlock:**
+        - ✅ Full Deep Dive analysis with charts
+        - ✅ Unlimited simulations
+        - ✅ Advanced crash detection
+        """)
+        
+        if st.button("⭐ Upgrade to Premium", use_container_width=True):
+            st.info("💡 Premium plans coming soon! Contact support@tectoniq.app")
 
 
 # =============================================================================
@@ -120,13 +323,21 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     </style>
     """
     
-    # Get current date and user
+    # Get current date and user (PLG version)
     current_date = datetime.now().strftime("%b %d, %Y")
-    user_email = get_current_user_email()
-    user_name = user_email.split('@')[0] if user_email else "User"
-    user_tier = st.session_state.get('tier', 'free')
-    tier_label = "Premium" if user_tier == "premium" else "Free"
-    tier_color = "#FFD700" if user_tier == "premium" else "#95A5A6"
+    user_name = st.session_state.get('username', 'Public')
+    user_tier = st.session_state.get('user_tier', 'public')
+    
+    # Tier display
+    if user_tier == "premium":
+        tier_label = "Premium"
+        tier_color = "#FFD700"
+    elif user_tier == "free":
+        tier_label = "Free"
+        tier_color = "#27AE60"
+    else:
+        tier_label = "Public"
+        tier_color = "#95A5A6"
     
     vitals_html = f"""
     {vitals_css}
@@ -135,19 +346,19 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
             <div class="vitals-left">
                 <div class="vitals-item">
                     <span>📅 {current_date}</span>
-                </div>
+        </div>
                 <div class="vitals-item">
                     <span class="status-online"></span>
                     <span>System Status: <strong>ONLINE</strong></span>
-                </div>
-            </div>
-            <div class="vitals-right">
-                <div class="vitals-item">
-                    <span>Logged in as <strong>{user_name}</strong> <span style="color: {tier_color};">({tier_label})</span></span>
-                </div>
             </div>
         </div>
+            <div class="vitals-right">
+                <div class="vitals-item">
+                    <span><strong>{user_name}</strong> <span style="color: {tier_color};">({tier_label})</span></span>
     </div>
+    </div>
+    </div>
+        </div>
     """
     
     st.markdown(vitals_html, unsafe_allow_html=True)
@@ -260,9 +471,30 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
 
 
 def handle_header_search(query: str, validate_func, search_func, analyze_func):
-    """Handle search from header control deck."""
+    """
+    Handle search from header control deck with PLG rate limiting.
+    
+    Rate Limits:
+    - Public: 2 searches per hour
+    - Free/Premium: Unlimited
+    """
     if not query or len(query.strip()) == 0:
         return
+    
+    # PLG: Check rate limit for public tier
+    tier = st.session_state.get('user_tier', 'public')
+    
+    if tier == "public":
+        if not check_rate_limit('search', 2):
+            st.error("🔒 **Search Limit Reached** (2 per hour for unauthenticated users)")
+            if st.button("📝 Sign Up for Free - Unlimited Searches", use_container_width=True, type="primary"):
+                st.session_state.show_signup_dialog = True
+                st.rerun()
+            return
+    
+    # Register the search action
+    if tier == "public":
+        register_action('search')
     
     ticker_input = query.strip().upper()
     
@@ -517,6 +749,16 @@ st.markdown("""
         color: #333333 !important;
     }
     
+    /* Dropdown/Select Text - Ensure Visibility */
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] div,
+    div[role="listbox"] span,
+    div[role="option"] span,
+    div[data-baseweb="select"] > div {
+        color: #333333 !important;
+        background-color: #FFFFFF !important;
+    }
+    
     /* Data Tables - Monospace for Numbers */
     .stDataFrame, table {
         font-family: 'Roboto Mono', monospace !important;
@@ -570,6 +812,78 @@ TICKER_NAME_FIXES = {
             }
             
 SPECIAL_TICKER_NAMES = {"^GDAXI": "DAX 40 Index"}
+
+
+def render_monte_carlo_simulation(ticker_symbol: str, current_price: float, current_vola: float, regime_obj: dict) -> None:
+    """
+    Render interactive Monte Carlo forecast simulation.
+    
+    Shows probabilistic price paths based on current market regime.
+    
+    Args:
+        ticker_symbol: Asset ticker (e.g., "BTC-USD")
+        current_price: Current asset price
+        current_vola: Historical volatility (daily)
+        regime_obj: Dict with 'name' and 'color' keys
+    """
+    import analytics_engine as ae
+    
+    st.markdown("### 🔮 Tectonic Forecast Engine (Experimental)")
+    st.caption("Monte Carlo projection based on current regime physics")
+    
+    # Get dark mode setting
+    is_dark = st.session_state.get('dark_mode', False)
+    
+    # Thematic spinner
+    with st.spinner(f"Calibrating Monte Carlo Engine for {ticker_symbol}... Applying {regime_obj.get('name', 'STABLE')} physics..."):
+        
+        # 1. Run simulation (returns quantiles + sample paths for texture)
+        sim_data, sample_paths = ae.run_monte_carlo_simulation(
+            start_price=current_price,
+            hist_vola=current_vola,
+            regime_obj=regime_obj,
+            days=30,
+            runs=1000
+        )
+        
+        # 2. Draw chart with sample paths for texture
+        fig = ae.plot_forecast(
+            sim_data, 
+            regime_obj.get('color', '#667eea'), 
+            sample_paths=sample_paths,
+            is_dark=is_dark
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 3. Calculate key metrics
+        start_p = sim_data['p50'].iloc[0]
+        end_median = sim_data['p50'].iloc[-1]
+        end_worst = sim_data['p05'].iloc[-1]
+        
+        exp_move = (end_median - start_p) / start_p
+        risk_move = (end_worst - start_p) / start_p
+        
+        # 4. Display metrics
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(
+                "Expected Drift (30d)", 
+                f"{exp_move:+.2%}",
+                help="The median outcome of 1,000 simulated paths."
+            )
+        with col2:
+            st.metric(
+                "Worst Case Risk (95% VaR)", 
+                f"{risk_move:+.2%}",
+                help="In 5% of scenarios, the price drops lower than this."
+            )
+            # Visual warning for high downside risk
+            if risk_move < -0.10:
+                st.caption(f"⚠️ High Downside Risk detected by {regime_obj.get('name', 'UNKNOWN')} parameters.")
+    
+    # Footnote
+    st.caption(f"Simulation based on **{regime_obj.get('name', 'STABLE')}** parameters: Volatility Multiplier & Shock Probability applied.")
+
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -986,19 +1300,22 @@ def show_news_dialog():
 
 def main():
     """
-    Main application entry point - Multi-User SaaS Edition.
+    Main application entry point - Product-Led Growth Edition.
     
     Flow:
         1. Show legal disclaimer (must accept to continue)
-        2. Check user authentication (Supabase)
-        3. Initialize session state
+        2. Initialize PLG session state (tier, rate limits)
+        3. Render sidebar login/status
         4. Apply theme CSS
-        5. Render sidebar with logout + user info
-        6. Render sticky cockpit header (always visible)
-        7. Main content area:
-           - No asset: Education landing + quick picks
-           - Asset selected: Deep Dive or Simulation tabs (tier-gated)
+        5. Render header (with search)
+        6. Main content area (with tier-based gating):
+           - Search: Public limited (2/hr), Free/Premium unlimited
+           - Hero Card: All tiers (if search allowed)
+           - Deep Dive: Premium only (soft gate for Public/Free)
+           - Simulation: Public locked, Free limited (3/hr), Premium unlimited
     """
+    from auth_manager import is_authenticated, get_current_user_id
+    
     # Session state initialization
     if 'disclaimer_accepted' not in st.session_state:
         st.session_state.disclaimer_accepted = False
@@ -1010,6 +1327,21 @@ def main():
         st.session_state.analysis_mode = "deep_dive"
     if 'current_ticker' not in st.session_state:
         st.session_state.current_ticker = None
+    if 'show_login_dialog' not in st.session_state:
+        st.session_state.show_login_dialog = False
+    if 'show_signup_dialog' not in st.session_state:
+        st.session_state.show_signup_dialog = False
+    
+    # Initialize tier based on authentication status
+    if is_authenticated():
+        # User is logged in - tier comes from Supabase profile
+        if 'tier' not in st.session_state:
+            st.session_state.tier = "free"  # Default, will be loaded from profile
+        st.session_state.user_tier = st.session_state.tier
+    else:
+        # Not logged in
+        st.session_state.tier = "public"
+        st.session_state.user_tier = "public"
     
     # Apply Scientific Heritage CSS theme FIRST (before any page)
     st.markdown(get_scientific_heritage_css(), unsafe_allow_html=True)
@@ -1019,11 +1351,18 @@ def main():
         render_disclaimer()
         return
     
-    # === AUTHENTICATION GATE (THE GATEKEEPER) ===
-    # Check if user is authenticated via Supabase
-    if not is_authenticated():
-        render_auth_page()
-        return
+    # Trigger auth dialogs if requested
+    if st.session_state.get('show_login_dialog', False):
+        render_login_dialog()
+    
+    if st.session_state.get('show_signup_dialog', False):
+        render_signup_dialog()
+    
+    # PLG: Render sidebar login/status
+    render_sidebar_login()
+    
+    # Apply Scientific Heritage CSS theme
+    st.markdown(get_scientific_heritage_css(), unsafe_allow_html=True)
     
     # Handle refresh from vitals bar
     if st.session_state.get('trigger_refresh', False):
@@ -1036,6 +1375,10 @@ def main():
         st.rerun()
     
     # === SCIENTIFIC MASTHEAD (Journal-style Header) ===
+    # Get user tier for display
+    tier = st.session_state.get('user_tier', 'public')
+    username = st.session_state.get('username', 'Public')
+    
     render_header(validate_ticker, search_ticker, run_analysis)
     
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
@@ -1309,33 +1652,92 @@ def main():
                 
                 # Render with new trading card style
                 render_hero_specimen(
-                    ticker=symbol,
-                    asset_name=full_name,
-                    current_price=price_display,
-                    price_change_24h=change_display,
+                        ticker=symbol,
+                        asset_name=full_name,
+                        current_price=price_display,
+                        price_change_24h=change_display,
                     criticality=int(criticality),
                     trend=trend,
                     is_invested=is_invested,
                     volatility_percentile=vol_percentile
-                )
+                    )
 
-                # === SOC Chart (Plotly) ===
-                if not full_history.empty:
-                    analyzer = SOCAnalyzer(full_history, symbol, selected.get('info'))
-                    figs = analyzer.get_plotly_figures(dark_mode=is_dark)
-                    st.plotly_chart(figs['chart3'], width="stretch")
-                    
-                    # Advanced analytics (event-based)
-                    render_advanced_analytics(full_history, is_dark=is_dark)
+                # === SOC Chart (Plotly) - PREMIUM FEATURE ===
+                tier = st.session_state.get('user_tier', 'public')
+                
+                if tier == "premium":
+                    # Premium: Full access to charts and analytics
+                    if not full_history.empty:
+                        analyzer = SOCAnalyzer(full_history, symbol, selected.get('info'))
+                        figs = analyzer.get_plotly_figures(dark_mode=is_dark)
+                        st.plotly_chart(figs['chart3'], width="stretch")
+                        
+                        # Advanced analytics (event-based)
+                        render_advanced_analytics(full_history, is_dark=is_dark)
+                        
+                        # === MONTE CARLO FORECAST ===
+                        st.markdown("---")
+                        
+                        # Get current volatility from the market state (same as used in Hero Card)
+                        # This is the rolling 30-day volatility already calculated by get_current_market_state
+                        current_vola = current_state.get('raw_data', {}).get('volatility', 0.02)
+                        
+                        # Ensure it's a valid float
+                        if current_vola is None or current_vola == 0:
+                            current_vola = 0.02  # Default to 2% if missing or zero
+                        
+                        # Prepare regime object from current state
+                        regime_name = current_state.get('regime_name', 'STABLE')
+                        regime_obj = {
+                            'name': regime_name,
+                            'color': current_state.get('regime_color', '#667eea')
+                        }
+                        
+                        # Render Monte Carlo simulation
+                        render_monte_carlo_simulation(
+                            ticker_symbol=symbol,
+                            current_price=price,
+                            current_vola=current_vola,
+                            regime_obj=regime_obj
+                        )
+                    else:
+                        st.warning("No data available for this asset.")
                 else:
-                    st.warning("No data available for this asset.")
-        else:
-            # Portfolio Simulation (unlimited for all users)
-            st.markdown("### DCA Simulation")
+                    # Public/Free: Soft gate with upgrade prompt
+                    st.info("🔒 **Deep Dive Analysis** (Charts & Historical Data) requires **Premium Access**")
+                    show_upgrade_dialog("Deep Dive Analysis", tier)
+        elif st.session_state.analysis_mode == "simulation":
+            # Portfolio Simulation - TIERED ACCESS
+            st.markdown("### Portfolio Simulation")
             st.markdown("---")
             
-            result_tickers = [r['symbol'] for r in results]
-            render_dca_simulation(result_tickers)
+            tier = st.session_state.get('user_tier', 'public')
+            
+            if tier == "public":
+                # Public: Locked
+                st.info("🔒 **Portfolio Simulation** is not available for Public users")
+                show_upgrade_dialog("Portfolio Simulation", tier)
+            
+            elif tier == "free":
+                # Free: Limited (3 simulations per hour)
+                if not check_rate_limit('simulation', 3):
+                    st.warning("⏱️ **Simulation Limit Reached** (3 per hour for Free tier)")
+                    st.info("💡 **Upgrade to Premium** for unlimited simulations! Login as: `premium` / `123`")
+                else:
+                    # Check if they're about to run a simulation
+                    if st.session_state.get('simulation_running', False):
+                        register_action('simulation')
+                        st.session_state.simulation_running = False
+                    
+                    result_tickers = [r['symbol'] for r in results]
+                    remaining = get_remaining_actions('simulation', 3)
+                    st.caption(f"ℹ️ Free tier: {remaining}/3 simulations remaining this hour")
+                    render_dca_simulation(result_tickers)
+            
+            else:  # premium
+                # Premium: Unlimited
+                result_tickers = [r['symbol'] for r in results]
+                render_dca_simulation(result_tickers)
     
     # === FOOTER WITH LEGAL LINKS ===
     st.markdown("<div style='height: 3rem;'></div>", unsafe_allow_html=True)

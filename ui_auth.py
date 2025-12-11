@@ -23,39 +23,104 @@ from config import LEGAL_DISCLAIMER
 from auth_manager import login, signup, logout, is_authenticated
 
 
-def render_disclaimer() -> None:
+@st.dialog("⚖️ TECTONIQ - Legal Disclaimer", width="large")
+def render_disclaimer_dialog() -> None:
     """
-    Render legal disclaimer page that must be accepted before using the app.
-    Uses session state to track acceptance.
+    Render legal disclaimer as a modal dialog that appears on first load.
+    Clean and condensed version.
     """
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;700&family=Roboto+Condensed:wght@300;400;700&display=swap');
-        .stApp { background-color: #F9F7F1; }
-        h1, h2, h3 { color: #2C3E50 !important; font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', serif !important; }
-        p, li { color: #333333 !important; font-size: 1rem !important; font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Condensed', sans-serif !important; }
-    </style>
-    """, unsafe_allow_html=True)
-                
-    st.title("TECTONIQ")
+    st.markdown("### Welcome to TECTONIQ")
     st.caption("Move Beyond Buy & Hope")
     
     st.markdown("---")
     
-    # Display disclaimer without HTML tags - use pure markdown
+    # Condensed disclaimer content
     st.markdown("""
-    ## ⚖️ Legal Disclaimer & Terms of Use
+    **IMPORTANT: Please read carefully before using this application.**
+    
+    #### Educational Purpose Only
+    
+    This application is provided **exclusively for educational and informational purposes**. 
+    The analysis, signals, and data are intended to help users understand market dynamics 
+    through Self-Organized Criticality (SOC) theory.
+    
+    #### Key Terms
+    
+    - **No Financial Advice**: This application does NOT provide financial, investment, 
+      or professional advice. Content is not a recommendation to buy, sell, or hold any asset.
+    
+    - **No Guarantees**: Past performance is NOT indicative of future results. 
+      All investment involves risk, including potential loss of principal.
+    
+    - **Limitation of Liability**: Creators are NOT liable for any damages arising from 
+      your use of this application, including losses from investment decisions.
+    
+    - **Independent Verification**: Always consult with qualified financial advisors 
+      and conduct your own research before making financial decisions.
+    
+    - **Data Sources**: Market data is sourced from third-party providers (Yahoo Finance). 
+      We do not control or guarantee data accuracy.
+    
+    ---
+    
+    **By accepting, you acknowledge that:**
+    
+    ✓ You understand this is for educational purposes only  
+    ✓ You accept NO financial advice is provided  
+    ✓ You take full responsibility for your decisions  
+    ✓ You waive claims against the creators  
+    """)
+    
+    st.markdown("---")
+    
+    # Acceptance checkbox and button
+    accepted = st.checkbox(
+        "I have read, understood, and agree to the terms above",
+        key="disclaimer_checkbox"
+    )
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        if st.button(
+            "✅ Accept & Continue",
+            disabled=not accepted,
+            use_container_width=True,
+            type="primary"
+        ):
+            st.session_state.disclaimer_accepted = True
+            st.rerun()
+    
+    with col2:
+        if st.button(
+            "View Full Terms",
+            use_container_width=True
+        ):
+            st.session_state.show_full_disclaimer = True
+            st.rerun()
+    
+    if not accepted:
+        st.caption("⚠️ You must check the box above to continue")
+
+
+@st.dialog("⚖️ Full Legal Terms & Disclaimer", width="large")
+def render_full_disclaimer_dialog() -> None:
+    """
+    Show full legal disclaimer text in a scrollable dialog.
+    """
+    st.markdown("""
+    ### Legal Disclaimer & Terms of Use
     
     **IMPORTANT: Please read this disclaimer carefully before using this application.**
     
-    ### 1. Educational & Informational Purpose Only
+    #### 1. Educational & Informational Purpose Only
     
     This application ("SOC Market Seismograph") is provided **exclusively for educational
     and informational purposes**. The analysis, data, charts, signals, and any other
     information displayed are intended solely to help users understand market dynamics
     through the lens of Self-Organized Criticality (SOC) theory.
     
-    ### 2. No Financial Advice
+    #### 2. No Financial Advice
     
     **THIS APPLICATION DOES NOT PROVIDE FINANCIAL, INVESTMENT, TAX, LEGAL, OR
     PROFESSIONAL ADVICE OF ANY KIND.**
@@ -66,14 +131,14 @@ def render_disclaimer() -> None:
     - The "signals," "regimes," and "scores" are purely statistical observations based on
       historical data and mathematical models. They are NOT predictions of future performance.
     
-    ### 3. No Guarantees or Warranties
+    #### 3. No Guarantees or Warranties
     
     - Past performance is **NOT indicative of future results**.
     - All investment involves risk, including the potential loss of principal.
     - The accuracy, completeness, or reliability of the data and analysis is NOT guaranteed.
     - The application is provided "AS IS" without warranty of any kind, express or implied.
     
-    ### 4. Limitation of Liability
+    #### 4. Limitation of Liability
     
     To the fullest extent permitted by applicable law:
     
@@ -83,7 +148,7 @@ def render_disclaimer() -> None:
     - This includes, but is not limited to, any losses, damages, or claims arising from
       investment decisions made based on information displayed in this application.
     
-    ### 5. Independent Verification Required
+    #### 5. Independent Verification Required
     
     Before making any financial decision, you should:
     
@@ -91,255 +156,146 @@ def render_disclaimer() -> None:
     - Conduct your own independent research and due diligence.
     - Consider your personal financial situation, risk tolerance, and investment objectives.
     
-    ### 6. Data Sources
+    #### 6. Data Sources
     
     Market data is sourced from third-party providers (Yahoo Finance). We do not control
     or guarantee the accuracy, timeliness, or availability of this data.
     
-    ### 7. Jurisdiction
+    #### 7. Jurisdiction
     
     This disclaimer is governed by applicable laws. If any provision is found unenforceable,
     the remaining provisions shall continue in full force and effect.
-    
-    ---
-    
-    **By clicking "I Understand & Accept" below, you acknowledge that:**
-    
-    ✓ You have read and understood this disclaimer in its entirety.
-    
-    ✓ You agree that this application provides NO financial advice.
-    
-    ✓ You accept full responsibility for any decisions you make.
-    
-    ✓ You waive any claims against the creators arising from your use of this application.
     """)
+    
+    if st.button("Close", use_container_width=True):
+        st.session_state.show_full_disclaimer = False
+        st.rerun()
+
+
+def render_disclaimer() -> None:
+    """
+    Trigger the disclaimer dialog on page load.
+    This function is called from main app when disclaimer hasn't been accepted.
+    """
+    # Check if user wants to see full terms
+    if st.session_state.get('show_full_disclaimer', False):
+        render_full_disclaimer_dialog()
+    else:
+        # Show the condensed dialog
+        render_disclaimer_dialog()
+    
+    # Stop execution until accepted
+    st.stop()
+
+
+@st.dialog("🔐 Sign In to TECTONIQ", width="large")
+def render_login_dialog() -> None:
+    """
+    Modal dialog for user login.
+    Non-disruptive - overlays current page.
+    """
+    st.markdown("### Welcome Back")
+    st.caption("Sign in to access your portfolio and premium features")
     
     st.markdown("---")
     
-    # Acceptance checkbox and button
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        accepted = st.checkbox(
-            "I have read, understood, and agree to the terms above",
-            key="disclaimer_checkbox"
-        )
+    with st.form("login_form_dialog", clear_on_submit=False):
+        email = st.text_input("Email", placeholder="your@email.com", key="login_email_dialog")
+        password = st.text_input("Password", type="password", placeholder="••••••••", key="login_password_dialog")
         
-        if st.button(
-            "✅ I Understand & Accept",
-            disabled=not accepted,
-            use_container_width=True
-        ):
-            st.session_state.disclaimer_accepted = True
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            submit = st.form_submit_button("Login", use_container_width=True, type="primary")
+        with col2:
+            cancel = st.form_submit_button("Cancel", use_container_width=True)
+        
+        if cancel:
+            st.session_state.show_login_dialog = False
             st.rerun()
         
-        if not accepted:
-            st.caption("⚠️ You must check the box above to continue")
+        if submit:
+            if not email or not password:
+                st.error("Please enter both email and password")
+            else:
+                with st.spinner("🔐 Authenticating..."):
+                    try:
+                        success, error, user_data = login(email, password)
+                        
+                        if success:
+                            st.session_state.user = user_data
+                            st.session_state.tier = user_data['tier']
+                            st.session_state.authenticated = True
+                            st.session_state.show_login_dialog = False
+                            st.success(f"✅ Welcome back, {user_data['email']}!")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {error}")
+                    except Exception as e:
+                        st.error(f"⚠️ Authentication error: {str(e)}")
     
-    st.stop()
+    st.markdown("---")
+    st.caption("Don't have an account? Click 'Sign Up' in the sidebar.")
 
 
-def render_auth_page() -> None:
+@st.dialog("📝 Create Your TECTONIQ Account", width="large")
+def render_signup_dialog() -> None:
     """
-    Render modern login/signup page with tabs.
-    
-    This replaces the old simple access code system with full user authentication.
-    Supports both login for existing users and signup for new users.
+    Modal dialog for user signup.
+    Non-disruptive - overlays current page.
     """
-    # Apply minimal styling for auth page (light mode)
-    st.markdown("""
-    <style>
-        .stApp { 
-            background-color: #F9F7F1;
-        }
-        .auth-container {
-            background: white;
-            border-radius: 16px;
-            padding: 2.5rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            max-width: 450px;
-            margin: 0 auto;
-        }
-        .auth-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        .auth-header h1 {
-            color: #1a1a1a;
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-        .auth-header p {
-            color: #666;
-            font-size: 0.95rem;
-        }
-        /* Increase font sizes and darken text */
-        label, .stTextInput label, .stCheckbox label {
-            color: #1a1a1a !important;
-            font-size: 1.1rem !important;
-            font-weight: 500 !important;
-        }
-        p, div, span {
-            color: #333 !important;
-            font-size: 1rem !important;
-        }
-        /* ALL BUTTONS - Cream background, charcoal border & text */
-        .stButton > button,
-        .stButton button,
-        button,
-        button[kind="primary"],
-        button[kind="secondary"],
-        button[data-testid="baseButton-primary"],
-        button[data-testid="baseButton-secondary"],
-        div[data-testid="stButton"] button {
-            font-size: 1.1rem !important;
-            padding: 0.6rem 1.2rem !important;
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', serif !important;
-            font-weight: bold !important;
-            border-radius: 4px !important;
-            border: 1px solid #333333 !important;
-            background-color: #F9F7F1 !important;
-            background: #F9F7F1 !important;
-            color: #333333 !important;
-        }
-        
-        /* Force charcoal text color inside buttons */
-        .stButton > button p,
-        .stButton > button span,
-        .stButton > button div,
-        .stButton > button *,
-        button p,
-        button span,
-        button div,
-        button * {
-            color: #333333 !important;
-        }
-        
-        .stButton > button:hover,
-        .stButton button:hover,
-        button:hover,
-        button[kind="primary"]:hover,
-        button[kind="secondary"]:hover,
-        button[data-testid="baseButton-primary"]:hover,
-        button[data-testid="baseButton-secondary"]:hover,
-        div[data-testid="stButton"] button:hover {
-            background-color: #E6E1D3 !important;
-            background: #E6E1D3 !important;
-            border-color: #333333 !important;
-            color: #333333 !important;
-        }
-        
-        .stButton > button:hover *,
-        button:hover * {
-            color: #333333 !important;
-        }
-        /* Tab styling */
-        .stTabs [data-baseweb="tab-list"] button {
-            color: #1a1a1a !important;
-            font-size: 1.1rem !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown("### Join TECTONIQ")
+    st.caption("Start with our **Free tier** - no credit card required!")
     
-    # Center the auth form
-    col1, col2, col3 = st.columns([1, 2, 1])
+    st.markdown("---")
     
-    with col2:
-        # Logo
-        try:
-            col_logo_left, col_logo_center, col_logo_right = st.columns([1, 2, 1])
-            with col_logo_center:
-                st.image("assets/tectoniq_logo.png", width=200)
-        except:
-            pass  # Skip logo if not found
+    with st.form("signup_form_dialog", clear_on_submit=False):
+        email = st.text_input("Email", placeholder="your@email.com", key="signup_email_dialog")
+        password = st.text_input("Password", type="password", placeholder="Min. 6 characters", key="signup_password_dialog")
+        password_confirm = st.text_input("Confirm Password", type="password", placeholder="Re-enter password", key="signup_password_confirm_dialog")
         
-        st.markdown("""
-        <div class="auth-header">
-            <h1 style="color: #2C3E50; font-size: 2.2rem; font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', serif; font-weight: 700; letter-spacing: -0.5px;">TECTONIQ</h1>
-            <p style="color: #555; font-size: 1.1rem; font-weight: 600; font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Condensed', sans-serif;">Move Beyond Buy & Hope</p>
-            <p style="color: #666; font-size: 0.9rem; line-height: 1.5; max-width: 450px; margin: 8px auto 0; font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Condensed', sans-serif;">
-                Market crashes aren't random—they are physics. TECTONIQ visualizes systemic stress levels so you can navigate volatility with open eyes.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy", key="signup_terms_dialog")
         
-        # Tabs for Login / Sign Up (no emojis)
-        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            submit = st.form_submit_button("Create Account", use_container_width=True, type="primary")
+        with col2:
+            cancel = st.form_submit_button("Cancel", use_container_width=True)
         
-        # === LOGIN TAB ===
-        with tab1:
-            st.markdown("<h3 style='color: #1a1a1a; font-size: 1.5rem;'>Welcome Back</h3>", unsafe_allow_html=True)
-            
-            with st.form("login_form", clear_on_submit=False):
-                email = st.text_input("Email", placeholder="your@email.com", key="login_email")
-                password = st.text_input("Password", type="password", placeholder="••••••••", key="login_password")
-                
-                submit = st.form_submit_button("Login", use_container_width=True, type="primary")
-                
-                if submit:
-                    if not email or not password:
-                        st.error("Please enter both email and password")
-                    else:
-                        with st.spinner("🔐 Authenticating credentials... Establishing secure session..."):
-                            success, error, user_data = login(email, password)
-                            
-                            if success:
-                                st.session_state.user = user_data
-                                st.session_state.tier = user_data['tier']
-                                st.session_state.authenticated = True
-                                st.success(f"✅ Welcome back, {user_data['email']}!")
-                                st.rerun()
-                            else:
-                                st.error(f"❌ {error}")
+        if cancel:
+            st.session_state.show_signup_dialog = False
+            st.rerun()
         
-        # === SIGNUP TAB ===
-        with tab2:
-            st.markdown("<h3 style='color: #1a1a1a; font-size: 1.5rem;'>Create Your Account</h3>", unsafe_allow_html=True)
-            st.markdown("<p style='color: #555; font-size: 1rem;'>Start with our <strong>Free tier</strong> - no credit card required!</p>", unsafe_allow_html=True)
-            
-            with st.form("signup_form", clear_on_submit=False):
-                email = st.text_input("Email", placeholder="your@email.com", key="signup_email")
-                password = st.text_input("Password", type="password", placeholder="Min. 6 characters", key="signup_password")
-                password_confirm = st.text_input("Confirm Password", type="password", placeholder="Re-enter password", key="signup_password_confirm")
-                
-                agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy")
-                
-                submit = st.form_submit_button("Create Account", use_container_width=True, type="primary")
-                
-                if submit:
-                    # Validation
-                    if not email or not password or not password_confirm:
-                        st.error("Please fill in all fields")
-                    elif password != password_confirm:
-                        st.error("Passwords do not match")
-                    elif len(password) < 6:
-                        st.error("Password must be at least 6 characters")
-                    elif not agree_terms:
-                        st.error("Please agree to the Terms of Service")
-                    else:
-                        with st.spinner("🔬 Initializing new seismograph profile... Configuring monitoring arrays..."):
-                            success, error, user_data = signup(email, password)
-                            
-                            if success:
-                                st.session_state.user = user_data
-                                st.session_state.tier = user_data['tier']
-                                st.session_state.authenticated = True
-                                st.success(f"🎉 Account created! Welcome, {user_data['email']}!")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.error(f"❌ {error}")
-        
-        # Footer
-        st.markdown("---")
-        st.markdown("""
-        <div style="text-align: center; color: #666; font-size: 1rem;">
-            <p style="color: #555;">Secure authentication powered by Supabase</p>
-            <p style="color: #555;">Questions? Contact <a href="mailto:support@socseismograph.com" style="color: #0066cc;">support@socseismograph.com</a></p>
-        </div>
-        """, unsafe_allow_html=True)
+        if submit:
+            # Validation
+            if not email or not password or not password_confirm:
+                st.error("Please fill in all fields")
+            elif password != password_confirm:
+                st.error("Passwords do not match")
+            elif len(password) < 6:
+                st.error("Password must be at least 6 characters")
+            elif not agree_terms:
+                st.error("Please agree to the Terms of Service")
+            else:
+                with st.spinner("🔬 Creating your account..."):
+                    try:
+                        success, error, user_data = signup(email, password)
+                        
+                        if success:
+                            st.session_state.user = user_data
+                            st.session_state.tier = user_data['tier']
+                            st.session_state.authenticated = True
+                            st.session_state.show_signup_dialog = False
+                            st.success(f"🎉 Account created! Welcome, {user_data['email']}!")
+                            st.info("📧 Please check your inbox to confirm your email address.")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {error}")
+                    except Exception as e:
+                        st.error(f"⚠️ Signup error: {str(e)}")
     
-    st.stop()
+    st.markdown("---")
+    st.caption("Already have an account? Click 'Login' in the sidebar.")
 
 
 def render_scientific_masthead(validate_ticker_func: Callable, search_ticker_func: Callable, run_analysis_func: Callable) -> None:

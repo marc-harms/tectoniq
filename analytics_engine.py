@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 import yfinance as yf # Nur für den Test-Daten-Download nötig
 
 class MarketForensics:
@@ -218,6 +219,349 @@ class MarketForensics:
             'justified_signals': justified_signals,
             'false_alarms': false_alarms
         }
+
+
+# =============================================================================
+# MONTE CARLO FORECAST ENGINE
+# =============================================================================
+
+def get_sim_params(regime_name):
+    """
+    Physics Engine: Translates market regime into AGGRESSIVE simulation parameters.
+    
+    Each regime produces visually distinct forecast shapes:
+    - CRASH/DECLINE: Strong downward drift (cone points down)
+    - CRITICAL: Extreme volatility with downside skew (fat fan drags down)
+    - MANIA/HIGH_ENERGY: Strong upward drift (cone points up)
+    - DORMANT: Minimal drift and volatility (narrow flat tube)
+    
+    Args:
+        regime_name: String containing regime name (e.g., "CRITICAL INSTABILITY", "HIGH ENERGY MANIA")
+        
+    Returns:
+        tuple: (drift_adj, vola_mult, shock_prob, downside_skew)
+    """
+    # Defaults (Organic Growth / Stable)
+    drift_adj = 0.0008      # Slight upward bias
+    vola_mult = 1.0         # Normal volatility
+    shock_prob = 0.005      # 0.5% probability of shock per day
+    downside_skew = False   # No asymmetric skew by default
+    
+    regime_upper = regime_name.upper()
+    
+    # STRUCTURAL DECLINE (Slate) - The cone points DOWN
+    if "CRASH" in regime_upper or "DECLINE" in regime_upper:
+        drift_adj = -0.0015     # Strong NEGATIVE drift (-0.15% daily = -4.5% monthly)
+        vola_mult = 1.8         # High volatility
+        shock_prob = 0.06       # Frequent shocks
+        downside_skew = False   # Already going down
+    
+    # CRITICAL INSTABILITY (Magma) - Fat fan drags downwards
+    elif "CRITICAL" in regime_upper:
+        drift_adj = -0.0008     # Slight negative (gravity effect)
+        vola_mult = 2.5         # EXTREME volatility (2.5x)
+        shock_prob = 0.10       # Very high crash risk
+        downside_skew = True    # Asymmetric: downside moves magnified
+    
+    # HIGH ENERGY MANIA (Pyrite/Gold) - The cone points UP
+    elif "MANIA" in regime_upper or "HIGH_ENERGY" in regime_upper or "HIGH ENERGY" in regime_upper:
+        drift_adj = 0.0012      # Strong POSITIVE drift (+0.12% daily = +3.6% monthly)
+        vola_mult = 1.4         # Elevated volatility (nervous momentum)
+        shock_prob = 0.03       # Some risk of reversal
+        downside_skew = False   # Momentum carries upward
+    
+    # DORMANT (Moss) - Narrow flat tube
+    elif "DORMANT" in regime_upper:
+        drift_adj = 0.0         # No drift
+        vola_mult = 0.4         # Very LOW volatility
+        shock_prob = 0.0        # No shocks
+        downside_skew = False
+    
+    # GROWTH/STABLE/ACTIVE - Normal behavior
+    elif "GROWTH" in regime_upper or "STABLE" in regime_upper or "ACTIVE" in regime_upper:
+        # Keep defaults (slight upward bias, normal vol)
+        pass
+        
+    return drift_adj, vola_mult, shock_prob, downside_skew
+
+
+def run_monte_carlo_simulation(start_price, hist_vola, regime_obj, days=30, runs=1000):
+    """
+    Run Monte Carlo simulation with AGGRESSIVE regime-specific physics.
+    
+    Implements:
+    - Directional drift (regimes have clear up/down bias)
+    - Asymmetric downside skew for critical regimes
+    - Sample path extraction for texture visualization
+    
+    Args:
+        start_price: Current asset price
+        hist_vola: Historical volatility (daily)
+        regime_obj: Dict with 'name' and 'color' keys
+        days: Forecast horizon (default 30)
+        runs: Number of simulation paths (default 1000)
+        
+    Returns:
+        tuple: (quantiles_df, sample_paths)
+            - quantiles_df: DataFrame with day, p05, p25, p50, p75, p95
+            - sample_paths: List of 3 random simulation paths for texture
+    """
+    regime_name = regime_obj.get('name', 'STABLE')
+    drift_adj, vola_mult, shock_prob, downside_skew = get_sim_params(regime_name)
+    
+    # Adjust parameters
+    sim_vola = hist_vola * vola_mult
+    mu = drift_adj 
+    
+    # Vectorized simulation (faster than loops)
+    # 1. Calculate shocks (Yes/No matrix)
+    shock_matrix = np.random.choice([0, 1], size=(runs, days), p=[1-shock_prob, shock_prob])
+    
+    # 2. Shock magnitude (Random between 0% and -5%)
+    shock_values = np.random.uniform(0, -0.05, size=(runs, days)) * shock_matrix
+    
+    # 3. Daily returns (Geometric Brownian Motion + Shocks)
+    daily_returns = np.random.normal(mu, sim_vola, (runs, days)) + shock_values
+    
+    # 4. Apply DOWNSIDE SKEW if enabled (for CRITICAL regime)
+    # Amplify negative moves, dampen positive moves
+    if downside_skew:
+        daily_returns = np.where(
+            daily_returns < 0,
+            daily_returns * 1.5,  # Magnify downside by 50%
+            daily_returns * 0.5   # Dampen upside by 50%
+        )
+    
+    # 5. Cumulative price paths
+    price_paths = np.zeros((runs, days + 1))
+    price_paths[:, 0] = start_price
+    
+    for t in range(1, days + 1):
+        price_paths[:, t] = price_paths[:, t-1] * (1 + daily_returns[:, t-1])
+    
+    # 6. Extract 3 random sample paths for texture visualization
+    sample_indices = np.random.choice(runs, size=3, replace=False)
+    day_array = np.arange(days + 1)  # Convert to numpy array for plotly compatibility
+    sample_paths = [
+        {'day': day_array, 'price': price_paths[idx, :]} 
+        for idx in sample_indices
+    ]
+        
+    # 7. Extract detailed quantiles for multi-layer fan chart
+    quantiles_df = pd.DataFrame({
+        'day': day_array,  # Use same numpy array for consistency
+        'p05': np.percentile(price_paths, 5, axis=0),   # Worst Case (Extreme)
+        'p25': np.percentile(price_paths, 25, axis=0),  # Lower Band (Likely)
+        'p50': np.percentile(price_paths, 50, axis=0),  # Median
+        'p75': np.percentile(price_paths, 75, axis=0),  # Upper Band (Likely)
+        'p95': np.percentile(price_paths, 95, axis=0)   # Best Case (Extreme)
+    })
+    
+    return quantiles_df, sample_paths
+
+
+def hex_to_rgba(hex_color, opacity):
+    """
+    Convert hex color to RGBA string with specified opacity.
+    
+    This helper ensures precise control over transparency in the fan chart layers.
+    
+    Args:
+        hex_color: Hex color string (e.g., "#C0392B" or "C0392B")
+        opacity: Float between 0.0 and 1.0
+        
+    Returns:
+        String in format "rgba(r, g, b, a)"
+        
+    Example:
+        >>> hex_to_rgba("#C0392B", 0.1)
+        "rgba(192, 57, 43, 0.1)"
+    """
+    # Remove # if present
+    hex_color = hex_color.lstrip('#')
+    
+    # Convert hex to RGB
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    
+    return f"rgba({r}, {g}, {b}, {opacity})"
+
+
+def plot_forecast(sim_df, regime_color, sample_paths=None, is_dark=False):
+    """
+    Create a proper 'Fan Chart' (Probabilistic Cone) for Monte Carlo forecast.
+    
+    Uses RGBA colors for precise transparency control to prevent solid block appearance.
+    Creates four distinct visual layers with graduated opacity + texture.
+    
+    Visual Strategy:
+    - Layer 1: Outer extreme band (p05-p95) - Very faint background
+    - Layer 2: Inner likely band (p25-p75) - Slightly darker, overlays Layer 1
+    - Layer 3: Sample paths (texture) - Thin chaotic lines showing individual simulations
+    - Layer 4: Median projection - Bold dashed line
+    
+    Args:
+        sim_df: DataFrame with day, p05, p25, p50, p75, p95 columns
+        regime_color: Hex color code for the regime (e.g., "#C0392B")
+        sample_paths: List of dicts with 'day' and 'price' keys (for texture)
+        is_dark: Boolean for dark mode styling
+        
+    Returns:
+        Plotly Figure object with proper fan chart rendering
+    """
+    fig = go.Figure()
+    
+    # Background colors
+    bg_color = 'rgba(0,0,0,0)' if not is_dark else 'rgba(20,20,20,0.8)'
+    text_color = '#2C3E50' if not is_dark else '#E0E0E0'
+    grid_color = '#F2F3F4' if not is_dark else '#3A3A3A'
+    
+    # Convert regime color to RGBA with specific opacities
+    outer_fill = hex_to_rgba(regime_color, 0.1)   # 10% opacity for outer band
+    inner_fill = hex_to_rgba(regime_color, 0.25)  # 25% opacity for inner band (will overlay)
+    
+    # =============================================================================
+    # Layer 1: OUTER EXTREME BAND (p05 - p95)
+    # =============================================================================
+    # This is the background layer showing extreme possibilities
+    
+    # Trace A: Upper bound (p95) - invisible anchor line
+    fig.add_trace(go.Scatter(
+        x=sim_df['day'], 
+        y=sim_df['p95'],
+        mode='lines',
+        line=dict(width=0),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    
+    # Trace B: Lower bound (p05) - fills up to p95 with very light color
+    fig.add_trace(go.Scatter(
+        x=sim_df['day'], 
+        y=sim_df['p05'],
+        mode='lines',
+        line=dict(width=0),
+        fill='tonexty',
+        fillcolor=outer_fill,  # RGBA with 10% opacity
+        name='90% Range (Extreme)',
+        hoverinfo='skip',
+        showlegend=True
+    ))
+    
+    # =============================================================================
+    # Layer 2: INNER LIKELY BAND (p25 - p75)
+    # =============================================================================
+    # This overlays Layer 1, creating darker center to show likely outcomes
+    
+    # Trace C: Upper bound (p75) - invisible anchor line
+    fig.add_trace(go.Scatter(
+        x=sim_df['day'], 
+        y=sim_df['p75'],
+        mode='lines',
+        line=dict(width=0),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    
+    # Trace D: Lower bound (p25) - fills up to p75 with darker color
+    fig.add_trace(go.Scatter(
+        x=sim_df['day'], 
+        y=sim_df['p25'],
+        mode='lines',
+        line=dict(width=0),  # No visible line, just fill
+        fill='tonexty',
+        fillcolor=inner_fill,  # RGBA with 25% opacity
+        name='50% Range (Likely)',
+        hoverinfo='skip',
+        showlegend=True
+    ))
+    
+    # =============================================================================
+    # Layer 3: SAMPLE PATHS (Texture)
+    # =============================================================================
+    # Add 3 random individual simulation paths to show chaotic nature
+    # This prevents the chart from looking like a geometric shape
+    
+    if sample_paths:
+        path_color_rgba = hex_to_rgba(regime_color, 0.3)  # 30% opacity for texture
+        
+        for i, path in enumerate(sample_paths):
+            fig.add_trace(go.Scatter(
+                x=path['day'],
+                y=path['price'],
+                mode='lines',
+                line=dict(
+                    color=path_color_rgba,
+                    width=1  # Very thin lines
+                ),
+                showlegend=False,  # Don't clutter legend
+                hoverinfo='skip'
+            ))
+    
+    # =============================================================================
+    # Layer 4: MEDIAN PROJECTION LINE
+    # =============================================================================
+    # Bold dashed line showing the expected path
+    
+    fig.add_trace(go.Scatter(
+        x=sim_df['day'], 
+        y=sim_df['p50'],
+        mode='lines',
+        line=dict(
+            color=regime_color, 
+            width=2.5, 
+            dash='longdash'  # Professional dashed style
+        ),
+        name='Median Projection',
+        hovertemplate='Day %{x}<br>Median: %{y:.2f}<extra></extra>',
+        showlegend=True
+    ))
+    
+    # =============================================================================
+    # Layout Styling - Scientific Heritage Theme
+    # =============================================================================
+    fig.update_layout(
+        title="Probabilistic Path Projection (30 Days) - Experimental",
+        title_font=dict(
+            family="Merriweather, serif",
+            size=16,
+            color=text_color
+        ),
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        font=dict(family="Roboto, sans-serif", color=text_color, size=12),
+        height=400,
+        margin=dict(l=20, r=20, t=60, b=40),
+        xaxis=dict(
+            title="Days Forward",
+            title_font=dict(size=13),
+            showgrid=True, 
+            gridcolor=grid_color, 
+            gridwidth=1,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title="Projected Price", 
+            title_font=dict(size=13),
+            showgrid=True, 
+            gridcolor=grid_color,
+            gridwidth=1,
+            zeroline=False
+        ),
+        hovermode="x unified",
+        legend=dict(
+            orientation="h", 
+            yanchor="bottom", 
+            y=1.02, 
+            xanchor="right", 
+            x=1,
+            bgcolor='rgba(255,255,255,0.8)'
+        )
+    )
+    
+    return fig
+
 
 # --- TEST BEREICH (Wird nur im Terminal ausgeführt) ---
 if __name__ == "__main__":

@@ -233,13 +233,15 @@ def get_scientific_heritage_css() -> str:
         /* Import Roboto Slab as fallback for Rockwell */
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;700&family=Roboto+Condensed:wght@300;400;700&display=swap');
         
-        /* GLOBAL: Hide ALL keyboard shortcut tooltips/badges */
-        [data-testid="stTooltipHoverTarget"],
-        .stTooltipIcon,
-        [data-testid="stTooltipIcon"],
-        [title*="keyboard"],
-        [title*="Keyboard"],
-        [aria-label*="keyboard shortcut"] {
+        /* Import Material Icons for sidebar and UI icons */
+        @import url('https://fonts.googleapis.com/css2?family=Material+Icons');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+        
+        /* Hide keyboard shortcut tooltips/badges (but not sidebar or essential UI) */
+        /* Removed overly broad selectors that were hiding sidebar collapse button */
+        [data-testid="stTooltipHoverTarget"]:not([class*="sidebar"]),
+        .stTooltipIcon:not([class*="sidebar"]),
+        [data-testid="stTooltipIcon"]:not([class*="sidebar"]) {
             display: none !important;
             visibility: hidden !important;
             width: 0 !important;
@@ -360,19 +362,8 @@ def get_scientific_heritage_css() -> str:
             width: 100% !important;
         }
         
-        /* Ensure expander label text is visible */
-        div[data-testid="stExpander"] summary [title*="shortcut"],
-        div[data-testid="stExpander"] summary [title*="Shortcut"],
-        div[data-testid="stExpander"] summary [title*="Keyb"] {
-            font-size: 0px !important;
-            width: 0px !important;
-            height: 0px !important;
-            opacity: 0 !important;
-            overflow: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border: none !important;
-            }
+        /* Ensure expander label text is visible - REMOVED to fix sidebar icons */
+        /* This was hiding sidebar collapse button icons */
 
 
         /* 2. Fail-Safe: Stelle sicher, dass der Titel-Text (meistens <p>) sichtbar bleibt */
@@ -385,46 +376,26 @@ def get_scientific_heritage_css() -> str:
             color: #2C3E50 !important; /* Midnight Blue */
             }
         
-        /* Hide keyboard shortcut hints that overlap 
-        div[data-testid="stExpander"] summary::before,
-        div[data-testid="stExpander"] summary::after {
-            display: none !important;
-            content: none !important;
-        } */
-        
-        /* Hide only tooltips and keyboard shortcut badges in expanders 
-        div[data-testid="stExpander"] [data-testid="stTooltipHoverTarget"],
-        div[data-testid="stExpander"] .stTooltipIcon,
-        div[data-testid="stExpander"] [data-testid="stTooltipIcon"],
-        div[data-testid="stExpander"] [aria-label*="keyboard shortcut"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            width: 0 !important;
-            height: 0 !important;
-            position: absolute !important;
-            left: -9999px !important; */
-        }
-        
-        /* 3. Icon Korrektur (falls der Pfeil auch verschwindet) */
+        /* Expander icons - ensure SVG arrows are visible */
         div[data-testid="stExpander"] summary svg {
             display: block !important;
             visibility: visible !important;
             width: 1rem !important;
             height: 1rem !important;
-            }
+        }
 
         /* ALL BUTTONS - Cream background, charcoal border & text */
-        .stButton>button,
-        .stButton button,
-        button,
-        button[kind="primary"],
-        button[kind="secondary"],
-        button[type="submit"],
-        button[data-testid="baseButton-primary"],
-        button[data-testid="baseButton-secondary"],
-        div[data-testid="stButton"] button,
-        div.stButton > button {
+        /* Exclude sidebar collapse button from custom styling */
+        .stButton>button:not([class*="collapsedControl"]),
+        .stButton button:not([class*="collapsedControl"]),
+        button:not([class*="collapsedControl"]):not([data-testid*="collapsedControl"]),
+        button[kind="primary"]:not([class*="collapsedControl"]),
+        button[kind="secondary"]:not([class*="collapsedControl"]),
+        button[type="submit"]:not([class*="collapsedControl"]),
+        button[data-testid="baseButton-primary"]:not([class*="collapsedControl"]),
+        button[data-testid="baseButton-secondary"]:not([class*="collapsedControl"]),
+        div[data-testid="stButton"] button:not([class*="collapsedControl"]),
+        div.stButton > button:not([class*="collapsedControl"]) {
             border-radius: 4px !important;
             font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', serif !important;
             font-weight: bold !important;
@@ -436,27 +407,41 @@ def get_scientific_heritage_css() -> str:
             color: #333333 !important;
         }
         
-        /* Text inside buttons - FORCE charcoal color */
-        .stButton>button p,
-        .stButton>button span,
-        .stButton>button div,
-        .stButton>button *,
-        button p,
-        button span,
-        button div,
-        button * {
+        /* Sidebar collapse button - preserve default Streamlit styling */
+        button[class*="collapsedControl"],
+        button[data-testid*="collapsedControl"],
+        section[data-testid="stSidebar"] button[kind="header"] {
+            all: revert !important;
+        }
+        
+        /* Preserve icon fonts (Material Icons, etc.) */
+        button [class*="material-icons"],
+        button [class*="icon"],
+        button svg,
+        span[class*="material-icons"],
+        i[class*="material-icons"] {
+            font-family: 'Material Icons', 'Material Icons Extended' !important;
+        }
+        
+        /* Text inside buttons - FORCE charcoal color (but not icons) */
+        .stButton>button p:not([class*="icon"]),
+        .stButton>button span:not([class*="icon"]):not([class*="material"]),
+        .stButton>button div:not([class*="icon"]),
+        button:not([class*="collapsedControl"]) p:not([class*="icon"]),
+        button:not([class*="collapsedControl"]) span:not([class*="icon"]):not([class*="material"]),
+        button:not([class*="collapsedControl"]) div:not([class*="icon"]) {
             color: #333333 !important;
         }
         
-        .stButton>button:hover,
-        .stButton button:hover,
-        button:hover,
-        button[kind="primary"]:hover,
-        button[kind="secondary"]:hover,
-        button[data-testid="baseButton-primary"]:hover,
-        button[data-testid="baseButton-secondary"]:hover,
-        div[data-testid="stButton"] button:hover,
-        div.stButton > button:hover {
+        .stButton>button:not([class*="collapsedControl"]):hover,
+        .stButton button:not([class*="collapsedControl"]):hover,
+        button:not([class*="collapsedControl"]):hover,
+        button[kind="primary"]:not([class*="collapsedControl"]):hover,
+        button[kind="secondary"]:not([class*="collapsedControl"]):hover,
+        button[data-testid="baseButton-primary"]:not([class*="collapsedControl"]):hover,
+        button[data-testid="baseButton-secondary"]:not([class*="collapsedControl"]):hover,
+        div[data-testid="stButton"] button:not([class*="collapsedControl"]):hover,
+        div.stButton > button:not([class*="collapsedControl"]):hover {
             background-color: #E6E1D3 !important;
             background: #E6E1D3 !important;
             border-color: #333333 !important;
@@ -464,8 +449,8 @@ def get_scientific_heritage_css() -> str:
             color: #333333 !important;
         }
         
-        .stButton>button:hover *,
-        button:hover * {
+        .stButton>button:not([class*="collapsedControl"]):hover *:not([class*="icon"]):not([class*="material"]),
+        button:not([class*="collapsedControl"]):hover *:not([class*="icon"]):not([class*="material"]) {
             color: #333333 !important;
         }
         
@@ -507,6 +492,51 @@ def get_scientific_heritage_css() -> str:
         /* Sidebar (if used) */
         section[data-testid="stSidebar"] {
             background-color: #E6E1D3 !important;
+        }
+        
+        /* Sidebar collapse button - force default behavior and icon rendering */
+        section[data-testid="stSidebar"] button[kind="header"],
+        section[data-testid="stSidebar"] button[kind="headerNoPadding"],
+        button[class*="collapsedControl"],
+        button[data-testid*="baseButton-header"] {
+            all: revert !important;
+            font-family: inherit !important;
+        }
+        
+        /* Ensure Material Icons render in sidebar button */
+        section[data-testid="stSidebar"] button span[class*="material-icons"],
+        section[data-testid="stSidebar"] button span[class*="material-symbols"],
+        section[data-testid="stSidebar"] button [class*="icon"],
+        button[class*="collapsedControl"] span,
+        button[class*="collapsedControl"] [class*="icon"],
+        button[kind="header"] span,
+        button[kind="headerNoPadding"] span {
+            font-family: 'Material Symbols Outlined', 'Material Icons', 'Material Icons Extended' !important;
+            font-size: 24px !important;
+            display: inline-block !important;
+            line-height: 1 !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            word-wrap: normal !important;
+            white-space: nowrap !important;
+            direction: ltr !important;
+            -webkit-font-smoothing: antialiased !important;
+            text-rendering: optimizeLegibility !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            font-feature-settings: 'liga' !important;
+            font-weight: normal !important;
+        }
+        
+        /* Hide text content in icon-only buttons (sidebar collapse) */
+        button[kind="header"] p,
+        button[kind="headerNoPadding"] p,
+        button[class*="collapsedControl"] p {
+            font-size: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
+            opacity: 0 !important;
+            overflow: hidden !important;
+            position: absolute !important;
         }
     </style>
     """
