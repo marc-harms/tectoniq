@@ -1416,6 +1416,37 @@ def main():
         # Not logged in
         st.session_state.tier = "public"
     
+    # Handle payment redirect (success/cancel)
+    query_params = st.query_params
+    if "payment" in query_params:
+        payment_status = query_params["payment"]
+        
+        if payment_status == "success" and is_authenticated():
+            # Reload user tier from database (webhook should have updated it)
+            from auth_manager import get_supabase_client
+            try:
+                user_id = get_current_user_id()
+                if user_id:
+                    supabase = get_supabase_client()
+                    response = supabase.table('profiles').select('subscription_tier').eq('user_id', user_id).single().execute()
+                    if response.data:
+                        new_tier = response.data.get('subscription_tier', 'free')
+                        st.session_state.tier = new_tier
+                        
+                        if new_tier == 'premium':
+                            st.success("🎉 **Welcome to Premium!** All features unlocked.")
+                        else:
+                            st.warning("⏳ Payment processing... Your upgrade will be activated shortly.")
+            except Exception as e:
+                print(f"Error reloading tier: {e}")
+            
+            # Clear query params
+            st.query_params.clear()
+        
+        elif payment_status == "cancelled":
+            st.info("ℹ️ Payment cancelled. You can upgrade anytime from the sidebar.")
+            st.query_params.clear()
+    
     # Apply Scientific Heritage CSS theme FIRST (before any page)
     st.markdown(get_scientific_heritage_css(), unsafe_allow_html=True)
     
