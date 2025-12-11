@@ -42,7 +42,7 @@ from hero_card_visual_v2 import render_hero_specimen
 from auth_manager import (
     is_authenticated, logout, get_current_user_id, get_current_user_email,
     get_user_portfolio, can_access_simulation, show_upgrade_prompt,
-    can_run_simulation, increment_simulation_count
+    can_run_simulation, increment_simulation_count, get_user_tier
 )
 from config import get_scientific_heritage_css, HERITAGE_THEME, REGIME_COLORS
 from analytics_engine import MarketForensics
@@ -191,10 +191,40 @@ def render_sidebar_login() -> None:
             
             if tier == "free":
                 sim_remaining = get_remaining_actions('simulation', 3)
-                st.caption(f"🎯 Simulations: {sim_remaining}/3 per hour")
-                st.caption(f"🔍 Searches: Unlimited")
+                # Visual indicator for rate limit
+                if sim_remaining == 0:
+                    st.warning(f"⏱️ **Simulations:** 0/3 per hour\n\n_Resets at top of next hour_")
+                elif sim_remaining <= 1:
+                    st.info(f"🎯 **Simulations:** {sim_remaining}/3 per hour")
+                else:
+                    st.success(f"🎯 **Simulations:** {sim_remaining}/3 per hour")
+                st.caption(f"🔍 **Searches:** Unlimited")
             else:  # premium
                 st.caption("✨ All features unlimited")
+            
+            # Subscription management for Premium users
+            if tier == "premium":
+                st.markdown("---")
+                st.markdown("**Subscription:**")
+                if st.button("📋 Manage Subscription", use_container_width=True):
+                    from stripe_manager import create_customer_portal_session
+                    from auth_manager import get_stripe_customer_id
+                    
+                    customer_id = get_stripe_customer_id(get_current_user_id())
+                    
+                    if customer_id:
+                        with st.spinner("Opening subscription portal..."):
+                            success, error, portal_url = create_customer_portal_session(customer_id)
+                            if success:
+                                st.markdown(
+                                    f'<meta http-equiv="refresh" content="0; url={portal_url}">',
+                                    unsafe_allow_html=True
+                                )
+                                st.markdown(f"[Manage Subscription →]({portal_url})")
+                            else:
+                                st.error(f"❌ {error}")
+                    else:
+                        st.warning("No active subscription found")
             
             # Logout button
             st.markdown("---")
@@ -207,10 +237,33 @@ def render_sidebar_login() -> None:
             if tier != "premium":
                 st.markdown("---")
                 st.markdown("### ⭐ Upgrade to Premium")
-                st.caption("Unlock Deep Dive + Unlimited simulations")
+                st.markdown("**$29/month** - Cancel anytime")
+                st.caption("✅ Deep Dive charts & analytics")
+                st.caption("✅ Unlimited simulations")
+                st.caption("✅ Monte Carlo forecasting")
                 
-                if st.button("💳 View Plans", use_container_width=True):
-                    st.info("💡 Premium plans coming soon! Contact support@tectoniq.app")
+                if st.button("💳 Upgrade Now", use_container_width=True, type="primary"):
+                    from stripe_manager import create_checkout_session
+                    
+                    user_id = get_current_user_id()
+                    user_email = get_current_user_email()
+                    
+                    if user_id and user_email:
+                        with st.spinner("🔄 Redirecting to secure checkout..."):
+                            success, error, checkout_url = create_checkout_session(user_email, user_id)
+                            
+                            if success:
+                                st.success("✅ Redirecting to Stripe Checkout...")
+                                # Use JavaScript redirect for better UX
+                                st.markdown(
+                                    f'<meta http-equiv="refresh" content="0; url={checkout_url}">',
+                                    unsafe_allow_html=True
+                                )
+                                st.markdown(f"[Click here if not redirected automatically]({checkout_url})")
+                            else:
+                                st.error(f"❌ {error}")
+                    else:
+                        st.error("Please log in first to upgrade")
 
 
 def show_upgrade_dialog(feature_name: str, tier: str):
@@ -242,11 +295,33 @@ def show_upgrade_dialog(feature_name: str, tier: str):
         **Upgrade to Premium to unlock:**
         - ✅ Full Deep Dive analysis with charts
         - ✅ Unlimited simulations
+        - ✅ Monte Carlo forecasting
         - ✅ Advanced crash detection
+        
+        **Only $29/month** - Cancel anytime
         """)
         
-        if st.button("⭐ Upgrade to Premium", use_container_width=True):
-            st.info("💡 Premium plans coming soon! Contact support@tectoniq.app")
+        if st.button("⭐ Upgrade to Premium", use_container_width=True, type="primary"):
+            from stripe_manager import create_checkout_session
+            
+            user_id = get_current_user_id()
+            user_email = get_current_user_email()
+            
+            if user_id and user_email:
+                with st.spinner("🔄 Redirecting to secure checkout..."):
+                    success, error, checkout_url = create_checkout_session(user_email, user_id)
+                    
+                    if success:
+                        st.success("✅ Redirecting to Stripe Checkout...")
+                        st.markdown(
+                            f'<meta http-equiv="refresh" content="0; url={checkout_url}">',
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(f"[Click here if not redirected]({checkout_url})")
+                    else:
+                        st.error(f"❌ {error}")
+            else:
+                st.error("Session expired. Please log in again")
 
 
 # =============================================================================
@@ -326,13 +401,13 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     # Get current date and user (PLG version)
     current_date = datetime.now().strftime("%b %d, %Y")
     user_name = st.session_state.get('username', 'Public')
-    user_tier = st.session_state.get('user_tier', 'public')
+    tier = get_user_tier()
     
     # Tier display
-    if user_tier == "premium":
+    if tier == "premium":
         tier_label = "Premium"
         tier_color = "#FFD700"
-    elif user_tier == "free":
+    elif tier == "free":
         tier_label = "Free"
         tier_color = "#27AE60"
     else:
@@ -482,7 +557,7 @@ def handle_header_search(query: str, validate_func, search_func, analyze_func):
         return
     
     # PLG: Check rate limit for public tier
-    tier = st.session_state.get('user_tier', 'public')
+    tier = get_user_tier()
     
     if tier == "public":
         if not check_rate_limit('search', 2):
@@ -1337,11 +1412,9 @@ def main():
         # User is logged in - tier comes from Supabase profile
         if 'tier' not in st.session_state:
             st.session_state.tier = "free"  # Default, will be loaded from profile
-        st.session_state.user_tier = st.session_state.tier
     else:
         # Not logged in
         st.session_state.tier = "public"
-        st.session_state.user_tier = "public"
     
     # Apply Scientific Heritage CSS theme FIRST (before any page)
     st.markdown(get_scientific_heritage_css(), unsafe_allow_html=True)
@@ -1376,7 +1449,7 @@ def main():
     
     # === SCIENTIFIC MASTHEAD (Journal-style Header) ===
     # Get user tier for display
-    tier = st.session_state.get('user_tier', 'public')
+    tier = get_user_tier()
     username = st.session_state.get('username', 'Public')
     
     render_header(validate_ticker, search_ticker, run_analysis)
@@ -1395,7 +1468,7 @@ def main():
                     st.rerun()
             
             user_id = get_current_user_id()
-            user_tier = st.session_state.get('tier', 'free')
+            tier = get_user_tier()
             
             if user_id:
                 portfolio = get_user_portfolio(user_id)
@@ -1663,7 +1736,7 @@ def main():
                     )
 
                 # === SOC Chart (Plotly) - PREMIUM FEATURE ===
-                tier = st.session_state.get('user_tier', 'public')
+                tier = get_user_tier()
                 
                 if tier == "premium":
                     # Premium: Full access to charts and analytics
@@ -1711,7 +1784,7 @@ def main():
             st.markdown("### Portfolio Simulation")
             st.markdown("---")
             
-            tier = st.session_state.get('user_tier', 'public')
+            tier = get_user_tier()
             
             if tier == "public":
                 # Public: Locked
@@ -1720,9 +1793,12 @@ def main():
             
             elif tier == "free":
                 # Free: Limited (3 simulations per hour)
+                remaining = get_remaining_actions('simulation', 3)
+                
                 if not check_rate_limit('simulation', 3):
                     st.warning("⏱️ **Simulation Limit Reached** (3 per hour for Free tier)")
-                    st.info("💡 **Upgrade to Premium** for unlimited simulations! Login as: `premium` / `123`")
+                    st.info("💡 **Upgrade to Premium** for unlimited simulations!")
+                    show_upgrade_dialog("Portfolio Simulation", tier)
                 else:
                     # Check if they're about to run a simulation
                     if st.session_state.get('simulation_running', False):
@@ -1730,8 +1806,13 @@ def main():
                         st.session_state.simulation_running = False
                     
                     result_tickers = [r['symbol'] for r in results]
-                    remaining = get_remaining_actions('simulation', 3)
-                    st.caption(f"ℹ️ Free tier: {remaining}/3 simulations remaining this hour")
+                    
+                    # Show prominent usage indicator
+                    if remaining <= 1:
+                        st.info(f"ℹ️ **Free tier:** {remaining}/3 simulations remaining this hour. Upgrade for unlimited!")
+                    else:
+                        st.success(f"✅ **Free tier:** {remaining}/3 simulations remaining this hour")
+                    
                     render_dca_simulation(result_tickers)
             
             else:  # premium

@@ -561,3 +561,100 @@ def get_current_user_email() -> Optional[str]:
         return st.session_state.user.get('email')
     return None
 
+
+def get_user_tier() -> str:
+    """
+    Get current user's subscription tier.
+    Single source of truth for tier checks throughout the app.
+    
+    Returns:
+        str: 'public' (not authenticated), 'free', or 'premium'
+    """
+    if is_authenticated():
+        # Get tier from session state (loaded from Supabase profile)
+        return st.session_state.get('tier', 'free')
+    else:
+        # Not logged in
+        return 'public'
+
+
+# =============================================================================
+# STRIPE INTEGRATION
+# =============================================================================
+
+def update_user_tier(user_id: str, new_tier: str, stripe_customer_id: Optional[str] = None, 
+                     stripe_subscription_id: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+    """
+    Update user's subscription tier in Supabase.
+    
+    Args:
+        user_id: Supabase user ID
+        new_tier: 'free' or 'premium'
+        stripe_customer_id: Stripe customer ID (optional)
+        stripe_subscription_id: Stripe subscription ID (optional)
+    
+    Returns:
+        Tuple of (success, error_message)
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        update_data = {
+            'subscription_tier': new_tier,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        if stripe_customer_id:
+            update_data['stripe_customer_id'] = stripe_customer_id
+        
+        if stripe_subscription_id:
+            update_data['stripe_subscription_id'] = stripe_subscription_id
+        
+        response = supabase.table('profiles').update(update_data).eq('user_id', user_id).execute()
+        
+        # Update session state
+        st.session_state.tier = new_tier
+        
+        return True, None
+        
+    except Exception as e:
+        return False, f"Database error: {str(e)}"
+
+
+def get_stripe_customer_id(user_id: str) -> Optional[str]:
+    """
+    Get Stripe customer ID for user.
+    
+    Args:
+        user_id: Supabase user ID
+    
+    Returns:
+        Stripe customer ID or None
+    """
+    try:
+        supabase = get_supabase_client()
+        response = supabase.table('profiles').select('stripe_customer_id').eq('user_id', user_id).single().execute()
+        return response.data.get('stripe_customer_id') if response.data else None
+    except Exception as e:
+        print(f"Error fetching Stripe customer ID: {e}")
+        return None
+
+
+def get_stripe_subscription_id(user_id: str) -> Optional[str]:
+    """
+    Get Stripe subscription ID for user.
+    
+    Args:
+        user_id: Supabase user ID
+    
+    Returns:
+        Stripe subscription ID or None
+    """
+    try:
+        supabase = get_supabase_client()
+        response = supabase.table('profiles').select('stripe_subscription_id').eq('user_id', user_id).single().execute()
+        return response.data.get('stripe_subscription_id') if response.data else None
+    except Exception as e:
+        print(f"Error fetching Stripe subscription ID: {e}")
+        return None
+
