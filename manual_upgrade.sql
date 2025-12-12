@@ -16,7 +16,6 @@
 UPDATE profiles
 SET 
     subscription_tier = 'premium',
-    subscription_status = 'active',
     updated_at = NOW()
 WHERE email = 'moin@moin.de';  -- CHANGE THIS TO YOUR EMAIL!
 
@@ -24,8 +23,6 @@ WHERE email = 'moin@moin.de';  -- CHANGE THIS TO YOUR EMAIL!
 SELECT 
     email,
     subscription_tier,
-    subscription_status,
-    stripe_customer_id,
     updated_at
 FROM profiles
 WHERE email = 'moin@moin.de';  -- CHANGE THIS TO YOUR EMAIL!
