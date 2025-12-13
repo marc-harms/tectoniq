@@ -382,7 +382,7 @@ def get_scientific_heritage_css() -> str:
             visibility: visible !important;
             width: 1rem !important;
             height: 1rem !important;
-        }
+            }
 
         /* ALL BUTTONS - Cream background, charcoal border & text */
         /* Exclude sidebar collapse button from custom styling */
