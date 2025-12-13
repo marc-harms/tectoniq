@@ -338,6 +338,57 @@ def render_portfolio_risk_view(user_portfolio: List[Dict[str, float]]) -> None:
     st.caption(f"Viewing detailed analysis for **{selected_symbol}**")
 
 
+def suggest_ticker_correction(invalid_symbol: str) -> Optional[str]:
+    """
+    Suggest correct ticker symbol for common company name inputs.
+    
+    Args:
+        invalid_symbol: The invalid symbol entered by user
+    
+    Returns:
+        Suggested ticker symbol or None
+    """
+    # Common company name to ticker mappings
+    common_mappings = {
+        'NVIDIA': 'NVDA',
+        'STRYKER': 'SYK',
+        'APPLE': 'AAPL',
+        'MICROSOFT': 'MSFT',
+        'GOOGLE': 'GOOGL',
+        'FACEBOOK': 'META',
+        'AMAZON': 'AMZN',
+        'TESLA': 'TSLA',
+        'NETFLIX': 'NFLX',
+        'INTEL': 'INTC',
+        'AMD': 'AMD',
+        'BOEING': 'BA',
+        'WALMART': 'WMT',
+        'DISNEY': 'DIS',
+        'COCA-COLA': 'KO',
+        'PEPSI': 'PEP',
+        'MCDONALD': 'MCD',
+        'VISA': 'V',
+        'MASTERCARD': 'MA',
+        'PAYPAL': 'PYPL',
+        'BITCOIN': 'BTC-USD',
+        'ETHEREUM': 'ETH-USD'
+    }
+    
+    # Check for partial matches
+    invalid_upper = invalid_symbol.upper().strip()
+    
+    # Exact match
+    if invalid_upper in common_mappings:
+        return common_mappings[invalid_upper]
+    
+    # Partial match
+    for name, ticker in common_mappings.items():
+        if name in invalid_upper or invalid_upper in name:
+            return ticker
+    
+    return None
+
+
 def compute_portfolio_state_from_user_input(user_portfolio: List[Dict[str, float]]) -> Optional[PortfolioState]:
     """
     Compute portfolio state from user's portfolio allocation.
@@ -365,7 +416,12 @@ def compute_portfolio_state_from_user_input(user_portfolio: List[Dict[str, float
             df = fetcher.fetch_data(symbol)
             
             if df is None or df.empty:
-                st.warning(f"No data available for {symbol}")
+                # Try to suggest correct ticker
+                suggested_ticker = suggest_ticker_correction(symbol)
+                if suggested_ticker:
+                    st.warning(f"❌ No data for **{symbol}**. Did you mean **{suggested_ticker}**?")
+                else:
+                    st.warning(f"❌ No data for **{symbol}**. Make sure you're using the ticker symbol (e.g., AAPL), not company name (Apple).")
                 continue
             
             # Compute market state (using existing validated logic - NO CHANGES)
@@ -379,13 +435,21 @@ def compute_portfolio_state_from_user_input(user_portfolio: List[Dict[str, float
             )
             
             asset_inputs.append(asset_input)
+            # Success - no message needed (we'll show summary at the end)
             
         except Exception as e:
-            st.warning(f"Error processing {symbol}: {str(e)}")
+            st.error(f"❌ Error processing **{symbol}**: {str(e)}")
             continue
     
     if not asset_inputs:
+        st.error("❌ No valid assets in portfolio. Please check your ticker symbols.")
         return None
+    
+    # Show success message
+    if len(asset_inputs) < len(user_portfolio):
+        st.info(f"ℹ️ Loaded {len(asset_inputs)} of {len(user_portfolio)} assets successfully.")
+    else:
+        st.success(f"✅ All {len(asset_inputs)} assets loaded successfully.")
     
     # Create PortfolioInput
     try:
@@ -430,7 +494,27 @@ def render_portfolio_input_simple() -> Optional[List[Dict[str, float]]]:
     
     with st.expander("⚙️ Configure Portfolio", expanded=False):
         st.markdown("#### Portfolio Holdings")
-        st.caption("Enter your asset allocation. Weights must sum to 100%.")
+        st.caption("⚠️ **Important:** Use ticker symbols (e.g., AAPL, MSFT, NVDA), not company names.")
+        
+        # Show common ticker examples
+        with st.expander("💡 Common Ticker Symbols", expanded=False):
+            st.markdown("""
+            **Technology:**  
+            AAPL (Apple), MSFT (Microsoft), NVDA (Nvidia), GOOGL (Google), META (Facebook), TSLA (Tesla)
+            
+            **ETFs:**  
+            SPY (S&P 500), QQQ (Nasdaq 100), IWM (Russell 2000), VTI (Total Market)
+            
+            **Healthcare:**  
+            SYK (Stryker), JNJ (Johnson & Johnson), UNH (UnitedHealth), PFE (Pfizer)
+            
+            **Crypto:**  
+            BTC-USD (Bitcoin), ETH-USD (Ethereum)
+            
+            **Find more tickers:** Use Yahoo Finance search
+            """)
+        
+        st.markdown("---")
         
         # Allow up to 5 assets
         num_assets = st.number_input(
@@ -454,10 +538,11 @@ def render_portfolio_input_simple() -> Optional[List[Dict[str, float]]]:
                     default_symbol = st.session_state.user_portfolio[i]['symbol']
                 
                 symbol = st.text_input(
-                    f"Asset {i+1}:",
+                    f"Ticker Symbol {i+1}:",
                     value=default_symbol,
                     key=f"portfolio_symbol_{i}",
-                    placeholder="e.g., SPY"
+                    placeholder="e.g., AAPL, SPY, NVDA",
+                    help="Enter ticker symbol, not company name. Use Yahoo Finance format (e.g., BTC-USD for Bitcoin)."
                 ).strip().upper()
             
             with col2:
