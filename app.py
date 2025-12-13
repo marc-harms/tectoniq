@@ -1651,6 +1651,15 @@ def main():
                 import re
                 regime_text = re.sub(r'[^\w\s-]', '', regime_text).strip()  # Remove non-alphanumeric except spaces and hyphens
                 
+                # Randomly select CTA text (3 options)
+                import random
+                cta_options = [
+                    "Access portfolio-level structural risk assessment.",  # Option A – Scientific
+                    "Unlock portfolio risk regimes and attribution.",      # Option B – Instrument
+                    "Create a portfolio view to assess structural market risk."  # Option C – Conservative
+                ]
+                cta_text = random.choice(cta_options)
+                
                 # Get color based on criticality
                 if criticality >= 70:
                     regime_color = "#FF6600"  # Red
