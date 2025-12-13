@@ -1,6 +1,7 @@
 [theme]
-primaryColor = "#2C3E50"        # Midnight Blue (Buttons, Highlights)
-backgroundColor = "#F9F7F1"     # Warm Paper
-secondaryBackgroundColor = "#E6E1D3"  # Parchment (Sidebar, containers)
-textColor = "#333333"           # Charcoal Text
-font = "serif"                  # Serif font for "Journal" look
+base = "light"
+primaryColor = "#5a6c7d"           # Muted accent (clinical, used sparingly)
+backgroundColor = "#FFFFFF"        # Cold paper white (not cream)
+secondaryBackgroundColor = "#FAFAFA"  # Very subtle off-white (sidebar, containers)
+textColor = "#2B2B2B"              # Charcoal text (high readability)
+font = "serif"                     # Serif font for journal aesthetic

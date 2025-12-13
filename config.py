@@ -217,326 +217,50 @@ CHART_COLORS = {
 # =============================================================================
 def get_scientific_heritage_css() -> str:
     """
-    Returns CSS for Scientific Heritage design system.
+    Returns CSS for Scientific Journal design system.
     
     Typography:
-        - Merriweather (serif) for headings
-        - Lato (sans-serif) for body text
+        - Libre Baskerville (serif) for headings - journal aesthetic
+        - Inter (sans-serif) for body text - clean and readable
     
     Visual Style:
-        - Warm paper background
-        - Subtle shadows for depth
-        - Earth-tone accent colors
+        - Cold white paper background (not cream)
+        - Charcoal text for high readability
+        - Subtle pencil-like dividers
+        - Minimal, clinical, calm
+    
+    Version: 2.0 (Journal Theme)
     """
-    return """
+    # Load external CSS file for cleaner separation
+    import os
+    css_path = os.path.join(os.path.dirname(__file__), 'assets', 'journal.css')
+    
+    try:
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+        return f"<style>{css_content}</style>"
+    except FileNotFoundError:
+        # Fallback: Minimal CSS if journal.css file not found
+        print("Warning: assets/journal.css not found, using minimal fallback CSS")
+        return """
     <style>
-        /* Import Roboto Slab as fallback for Rockwell */
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;700&family=Roboto+Condensed:wght@300;400;700&display=swap');
-        
-        /* Import Material Icons for sidebar and UI icons */
-        @import url('https://fonts.googleapis.com/css2?family=Material+Icons');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
-        
-        /* Hide keyboard shortcut tooltips/badges (but not sidebar or essential UI) */
-        /* Removed overly broad selectors that were hiding sidebar collapse button */
-        [data-testid="stTooltipHoverTarget"]:not([class*="sidebar"]),
-        .stTooltipIcon:not([class*="sidebar"]),
-        [data-testid="stTooltipIcon"]:not([class*="sidebar"]) {
-            display: none !important;
-            visibility: hidden !important;
-            width: 0 !important;
-            height: 0 !important;
-            opacity: 0 !important;
-        }
-        
-        /* Plotly Modebar (chart action icons) - Heritage design */
-        .modebar {
-            background-color: #F9F7F1 !important;
-            border: 1px solid #333333 !important;
-            border-radius: 4px !important;
-            padding: 2px !important;
-        }
-        
-        .modebar-btn {
-            font-size: 12px !important;
-        }
-        
-        .modebar-btn svg {
-            width: 12px !important;
-            height: 12px !important;
-        }
-        
-        .modebar-btn path {
-            fill: #333333 !important;
-        }
-        
-        .modebar-btn:hover path {
-            fill: #2C3E50 !important;
-        }
-        
-        .modebar-group {
-            padding: 2px !important;
-        }
-        
-        /* Global background */
+        /* Minimal fallback CSS - journal.css file not found */
         .stApp {
-            background-color: #F9F7F1 !important;
-        }
-        
-        /* Headings and all text in Rockwell Condensed */
-        h1, h2, h3, h4, h5, h6 {
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', 'Courier New', serif !important;
-            color: #2C3E50 !important;
-            font-weight: 700 !important;
-            letter-spacing: -0.5px !important;
-        }
-        
-        /* Body text also in Rockwell Condensed for consistency */
-        p, div, label, span, input, textarea {
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Condensed', 'Arial Narrow', sans-serif !important;
-            color: #333333 !important;
-        }
-        
-        /* Cards/Containers: like stacked paper */
-        div[data-testid="stMetric"], 
-        div[data-testid="column"] {
             background-color: #FFFFFF !important;
-            border: 1px solid #D1C4E9 !important;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.05) !important;
-            padding: 15px !important;
-            border-radius: 2px !important;
         }
         
-        /* Expander styling - fix overlapping text */
-        div[data-testid="stExpander"] {
-            background-color: #F9F7F1 !important;
-            border: 1px solid #D1C4E9 !important;
-            border-radius: 2px !important;
-            margin-bottom: 1rem !important;
-            position: relative !important;
-            z-index: 1 !important;
+        h1, h2, h3, h4, h5, h6 {
+            color: #2B2B2B !important;
         }
         
-        div[data-testid="stExpander"] summary {
-            font-family: 'Merriweather', serif !important;
-            color: #2C3E50 !important;
-            font-weight: 600 !important;
-            padding: 16px 12px !important;
-            line-height: 1.8 !important;
-            min-height: 56px !important;
-            display: flex !important;
-            align-items: center !important;
-            position: relative !important;
-            z-index: 2 !important;
-            background: #F9F7F1 !important;
+        p, div, label, span {
+            color: #4A4A4A !important;
         }
         
-        div[data-testid="stExpander"] div[role="button"] {
-            line-height: 1.8 !important;
-            min-height: 56px !important;
-            padding: 16px 12px !important;
-            background-color: #F9F7F1 !important;
-        }
-        
-        /* Expander content area */
-        div[data-testid="stExpander"] > div:not([data-testid="stExpanderDetails"]) {
-            background-color: #F9F7F1 !important;
-        }
-        
-        div[data-testid="stExpanderDetails"] {
-            background-color: #F9F7F1 !important;
-        }
-        
-        div[data-testid="stExpander"] summary p {
-            margin: 0 !important;
-            padding: 0 !important;
-            line-height: 1.8 !important;
-            position: relative !important;
-            z-index: 3 !important;
-        }
-        
-        /* Allow expander text to show */
-        div[data-testid="stExpander"] summary > div {
-            display: flex !important;
-            align-items: center !important;
-            width: 100% !important;
-        }
-        
-        /* Ensure expander label text is visible - REMOVED to fix sidebar icons */
-        /* This was hiding sidebar collapse button icons */
-
-
-        /* 2. Fail-Safe: Stelle sicher, dass der Titel-Text (meistens <p>) sichtbar bleibt */
-        div[data-testid="stExpander"] summary p,
-        div[data-testid="stExpander"] summary span:not([title*="shortcut"]) {
-            font-size: 1rem !important; /* Oder deine gewünschte Größe */
-            opacity: 1 !important;
-            display: block !important;
-            visibility: visible !important;
-            color: #2C3E50 !important; /* Midnight Blue */
-            }
-        
-        /* Expander icons - ensure SVG arrows are visible */
-        div[data-testid="stExpander"] summary svg {
-            display: block !important;
-            visibility: visible !important;
-            width: 1rem !important;
-            height: 1rem !important;
-            }
-
-        /* ALL BUTTONS - Cream background, charcoal border & text */
-        /* Exclude sidebar collapse button from custom styling */
-        .stButton>button:not([class*="collapsedControl"]),
-        .stButton button:not([class*="collapsedControl"]),
-        button:not([class*="collapsedControl"]):not([data-testid*="collapsedControl"]),
-        button[kind="primary"]:not([class*="collapsedControl"]),
-        button[kind="secondary"]:not([class*="collapsedControl"]),
-        button[type="submit"]:not([class*="collapsedControl"]),
-        button[data-testid="baseButton-primary"]:not([class*="collapsedControl"]),
-        button[data-testid="baseButton-secondary"]:not([class*="collapsedControl"]),
-        div[data-testid="stButton"] button:not([class*="collapsedControl"]),
-        div.stButton > button:not([class*="collapsedControl"]) {
-            border-radius: 4px !important;
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', serif !important;
-            font-weight: bold !important;
-            transition: all 0.2s ease !important;
-            letter-spacing: 0.5px !important;
-            border: 1px solid #333333 !important;
-            background-color: #F9F7F1 !important;
-            background: #F9F7F1 !important;
-            color: #333333 !important;
-        }
-        
-        /* Sidebar collapse button - preserve default Streamlit styling */
+        /* Preserve sidebar functionality */
         button[class*="collapsedControl"],
-        button[data-testid*="collapsedControl"],
         section[data-testid="stSidebar"] button[kind="header"] {
             all: revert !important;
-        }
-        
-        /* Preserve icon fonts (Material Icons, etc.) */
-        button [class*="material-icons"],
-        button [class*="icon"],
-        button svg,
-        span[class*="material-icons"],
-        i[class*="material-icons"] {
-            font-family: 'Material Icons', 'Material Icons Extended' !important;
-        }
-        
-        /* Text inside buttons - FORCE charcoal color (but not icons) */
-        .stButton>button p:not([class*="icon"]),
-        .stButton>button span:not([class*="icon"]):not([class*="material"]),
-        .stButton>button div:not([class*="icon"]),
-        button:not([class*="collapsedControl"]) p:not([class*="icon"]),
-        button:not([class*="collapsedControl"]) span:not([class*="icon"]):not([class*="material"]),
-        button:not([class*="collapsedControl"]) div:not([class*="icon"]) {
-            color: #333333 !important;
-        }
-        
-        .stButton>button:not([class*="collapsedControl"]):hover,
-        .stButton button:not([class*="collapsedControl"]):hover,
-        button:not([class*="collapsedControl"]):hover,
-        button[kind="primary"]:not([class*="collapsedControl"]):hover,
-        button[kind="secondary"]:not([class*="collapsedControl"]):hover,
-        button[data-testid="baseButton-primary"]:not([class*="collapsedControl"]):hover,
-        button[data-testid="baseButton-secondary"]:not([class*="collapsedControl"]):hover,
-        div[data-testid="stButton"] button:not([class*="collapsedControl"]):hover,
-        div.stButton > button:not([class*="collapsedControl"]):hover {
-            background-color: #E6E1D3 !important;
-            background: #E6E1D3 !important;
-            border-color: #333333 !important;
-            box-shadow: 2px 2px 8px rgba(0,0,0,0.1) !important;
-            color: #333333 !important;
-        }
-        
-        .stButton>button:not([class*="collapsedControl"]):hover *:not([class*="icon"]):not([class*="material"]),
-        button:not([class*="collapsedControl"]):hover *:not([class*="icon"]):not([class*="material"]) {
-            color: #333333 !important;
-        }
-        
-        /* Disabled buttons */
-        .stButton>button:disabled,
-        button:disabled {
-            opacity: 0.4 !important;
-            cursor: not-allowed !important;
-        }
-        
-        /* Form submit buttons */
-        button[type="submit"] {
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Slab', serif !important;
-            font-weight: bold !important;
-            background-color: #2C3E50 !important;
-            border: 2px solid #2C3E50 !important;
-            color: #F9F7F1 !important;
-        }
-        
-        /* Input fields */
-        input, textarea, select {
-            background-color: #FFFFFF !important;
-            border: 1px solid #D1C4E9 !important;
-            color: #333333 !important;
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Condensed', sans-serif !important;
-        }
-        
-        /* Tables */
-        table {
-            font-family: 'Rockwell Std Condensed', 'Rockwell', 'Roboto Condensed', sans-serif !important;
-        }
-        
-        /* Links */
-        a {
-            color: #2C3E50 !important;
-            text-decoration: underline !important;
-        }
-        
-        /* Sidebar (if used) */
-        section[data-testid="stSidebar"] {
-            background-color: #E6E1D3 !important;
-        }
-        
-        /* Sidebar collapse button - force default behavior and icon rendering */
-        section[data-testid="stSidebar"] button[kind="header"],
-        section[data-testid="stSidebar"] button[kind="headerNoPadding"],
-        button[class*="collapsedControl"],
-        button[data-testid*="baseButton-header"] {
-            all: revert !important;
-            font-family: inherit !important;
-        }
-        
-        /* Ensure Material Icons render in sidebar button */
-        section[data-testid="stSidebar"] button span[class*="material-icons"],
-        section[data-testid="stSidebar"] button span[class*="material-symbols"],
-        section[data-testid="stSidebar"] button [class*="icon"],
-        button[class*="collapsedControl"] span,
-        button[class*="collapsedControl"] [class*="icon"],
-        button[kind="header"] span,
-        button[kind="headerNoPadding"] span {
-            font-family: 'Material Symbols Outlined', 'Material Icons', 'Material Icons Extended' !important;
-            font-size: 24px !important;
-            display: inline-block !important;
-            line-height: 1 !important;
-            text-transform: none !important;
-            letter-spacing: normal !important;
-            word-wrap: normal !important;
-            white-space: nowrap !important;
-            direction: ltr !important;
-            -webkit-font-smoothing: antialiased !important;
-            text-rendering: optimizeLegibility !important;
-            -moz-osx-font-smoothing: grayscale !important;
-            font-feature-settings: 'liga' !important;
-            font-weight: normal !important;
-        }
-        
-        /* Hide text content in icon-only buttons (sidebar collapse) */
-        button[kind="header"] p,
-        button[kind="headerNoPadding"] p,
-        button[class*="collapsedControl"] p {
-            font-size: 0 !important;
-            width: 0 !important;
-            height: 0 !important;
-            opacity: 0 !important;
-            overflow: hidden !important;
-            position: absolute !important;
         }
     </style>
     """

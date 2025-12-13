@@ -1,0 +1,566 @@
+/*
+ * TECTONIQ - Scientific Journal Theme
+ * =====================================
+ * 
+ * Design Philosophy:
+ * - Cold white paper background (not cream)
+ * - Charcoal text for readability
+ * - Subtle pencil-like dividers
+ * - Journal typography (serif headings, clean body)
+ * - Minimal, calm, clinical aesthetic
+ * 
+ * Customization Hints:
+ * - Font family: Search for "font-family" and adjust serif/sans-serif choices
+ * - Divider intensity: Adjust opacity in .journal-divider (currently 0.15)
+ * - Accent color: Update --accent-color variable (currently #5a6c7d)
+ * 
+ * Version: 1.0
+ * Date: 2025-12-12
+ */
+
+/* ============================================================================
+   COLOR SYSTEM (Do not invent alternatives)
+   ============================================================================ */
+
+:root {
+    /* Base colors - cold paper white */
+    --paper-white: #FFFFFF;
+    --paper-bg: #FAFAFA;
+    
+    /* Text colors - charcoal hierarchy */
+    --text-primary: #2B2B2B;
+    --text-secondary: #4A4A4A;
+    --text-muted: #6B6B6B;
+    --text-light: #8B8B8B;
+    
+    /* Borders & dividers - subtle pencil-like */
+    --border-light: #E0E0E0;
+    --border-medium: #CCCCCC;
+    --divider-pencil: rgba(0, 0, 0, 0.12);
+    
+    /* Accent - muted, clinical (used sparingly) */
+    --accent-color: #5a6c7d;
+    --accent-light: #7a8c9d;
+    
+    /* Status colors - quiet, non-distracting */
+    --status-green: #4a7c59;
+    --status-yellow: #b8860b;
+    --status-red: #a24545;
+    
+    /* Status backgrounds - very subtle */
+    --status-green-bg: #f0f7f4;
+    --status-yellow-bg: #fffbf0;
+    --status-red-bg: #fff5f5;
+    
+    /* Spacing & layout */
+    --max-content-width: 900px;
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+}
+
+/* ============================================================================
+   GLOBAL BASE
+   ============================================================================ */
+
+.stApp {
+    background-color: var(--paper-white) !important;
+}
+
+/* Main content area */
+.main .block-container {
+    max-width: var(--max-content-width) !important;
+    padding-left: var(--spacing-md) !important;
+    padding-right: var(--spacing-md) !important;
+    padding-top: var(--spacing-lg) !important;
+    padding-bottom: var(--spacing-xl) !important;
+}
+
+/* ============================================================================
+   TYPOGRAPHY SYSTEM (Journal-like, calm)
+   ============================================================================ */
+
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Icons');
+
+/* Headings - serif for journal feel */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Libre Baskerville', 'Georgia', serif !important;
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.3 !important;
+    margin-top: var(--spacing-lg) !important;
+    margin-bottom: var(--spacing-sm) !important;
+}
+
+h1 {
+    font-size: 2rem !important;
+}
+
+h2 {
+    font-size: 1.5rem !important;
+}
+
+h3 {
+    font-size: 1.25rem !important;
+}
+
+h4, h5, h6 {
+    font-size: 1rem !important;
+}
+
+/* Body text - clean sans-serif */
+p, div, label, span, input, textarea, li, td, th {
+    font-family: 'Inter', 'Helvetica Neue', sans-serif !important;
+    color: var(--text-secondary) !important;
+    line-height: 1.6 !important;
+}
+
+/* Comfortable reading size */
+p {
+    font-size: 1rem !important;
+    margin-bottom: var(--spacing-sm) !important;
+}
+
+/* Caption/small text */
+.stCaption, [data-testid="stCaption"], small {
+    font-size: 0.875rem !important;
+    color: var(--text-muted) !important;
+    line-height: 1.5 !important;
+}
+
+/* ============================================================================
+   PENCIL DIVIDER (Subtle, low contrast)
+   ============================================================================ */
+
+/* Horizontal rules */
+hr, .journal-divider {
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(
+        to right,
+        transparent 0%,
+        var(--divider-pencil) 10%,
+        var(--divider-pencil) 90%,
+        transparent 100%
+    ) !important;
+    margin: var(--spacing-lg) 0 !important;
+    opacity: 0.6 !important;
+}
+
+/* Markdown horizontal rules */
+[data-testid="stMarkdownContainer"] hr {
+    border: none !important;
+    height: 1px !important;
+    background: var(--divider-pencil) !important;
+    margin: var(--spacing-md) 0 !important;
+}
+
+/* ============================================================================
+   CARDS & CONTAINERS (Minimal borders, subtle shadows)
+   ============================================================================ */
+
+/* Remove heavy backgrounds */
+div[data-testid="stVerticalBlock"],
+div[data-testid="stHorizontalBlock"] {
+    background-color: transparent !important;
+}
+
+/* Metrics/Cards */
+div[data-testid="stMetric"],
+div[data-testid="column"] > div {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 2px !important;
+    padding: var(--spacing-md) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+
+/* Metric values */
+div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+    font-size: 1.75rem !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+}
+
+/* Metric labels */
+div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+    font-size: 0.875rem !important;
+    color: var(--text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+/* ============================================================================
+   TABLES (Journal-style, clean and scannable)
+   ============================================================================ */
+
+/* Table container */
+div[data-testid="stDataFrame"],
+div[data-testid="stTable"] {
+    border: 1px solid var(--border-light) !important;
+    border-radius: 2px !important;
+    overflow: hidden !important;
+}
+
+/* Table header */
+table thead {
+    background-color: var(--paper-bg) !important;
+    border-bottom: 2px solid var(--border-medium) !important;
+}
+
+table thead th {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+    color: var(--text-primary) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: var(--spacing-sm) !important;
+    text-align: left !important;
+    border-bottom: 1px solid var(--border-medium) !important;
+}
+
+/* Table body */
+table tbody td {
+    font-size: 0.9375rem !important;
+    color: var(--text-secondary) !important;
+    padding: var(--spacing-sm) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+}
+
+/* Subtle zebra striping */
+table tbody tr:nth-child(even) {
+    background-color: var(--paper-bg) !important;
+}
+
+table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Numeric columns - right align */
+table tbody td:nth-child(n+2) {
+    text-align: right !important;
+}
+
+/* ============================================================================
+   BUTTONS (Print-era UI, minimal fill)
+   ============================================================================ */
+
+/* All buttons base style */
+button:not([class*="collapsedControl"]),
+.stButton > button,
+button[kind="primary"],
+button[kind="secondary"] {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 0.9375rem !important;
+    letter-spacing: 0.02em !important;
+    border-radius: 3px !important;
+    padding: 0.5rem 1.25rem !important;
+    transition: all 0.15s ease !important;
+    border: 1px solid var(--border-medium) !important;
+    background-color: var(--paper-white) !important;
+    color: var(--text-primary) !important;
+    cursor: pointer !important;
+}
+
+button:hover:not([class*="collapsedControl"]) {
+    border-color: var(--text-secondary) !important;
+    background-color: var(--paper-bg) !important;
+}
+
+/* Primary button */
+button[kind="primary"],
+button[data-testid="baseButton-primary"] {
+    background-color: var(--accent-color) !important;
+    border-color: var(--accent-color) !important;
+    color: var(--paper-white) !important;
+}
+
+button[kind="primary"]:hover,
+button[data-testid="baseButton-primary"]:hover {
+    background-color: var(--accent-light) !important;
+    border-color: var(--accent-light) !important;
+}
+
+/* Secondary button - outline */
+button[kind="secondary"],
+button[data-testid="baseButton-secondary"] {
+    background-color: transparent !important;
+    border: 1px solid var(--accent-color) !important;
+    color: var(--accent-color) !important;
+}
+
+button[kind="secondary"]:hover,
+button[data-testid="baseButton-secondary"]:hover {
+    background-color: rgba(90, 108, 125, 0.05) !important;
+}
+
+/* ============================================================================
+   EXPANDERS (Clean, understated)
+   ============================================================================ */
+
+div[data-testid="stExpander"] {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 2px !important;
+    margin-bottom: var(--spacing-md) !important;
+}
+
+div[data-testid="stExpander"] summary {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 500 !important;
+    color: var(--text-primary) !important;
+    padding: var(--spacing-sm) var(--spacing-md) !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease !important;
+}
+
+div[data-testid="stExpander"] summary:hover {
+    background-color: var(--paper-bg) !important;
+}
+
+div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] {
+    padding: var(--spacing-md) !important;
+    border-top: 1px solid var(--border-light) !important;
+}
+
+/* ============================================================================
+   ALERTS & STATUS MESSAGES (Calm, reduced vertical space)
+   ============================================================================ */
+
+/* Success messages */
+div[data-testid="stAlert"][data-baseweb="notification"][kind="success"],
+.stSuccess {
+    background-color: var(--status-green-bg) !important;
+    border-left: 3px solid var(--status-green) !important;
+    border-radius: 2px !important;
+    padding: var(--spacing-sm) var(--spacing-md) !important;
+    margin: var(--spacing-xs) 0 !important;
+}
+
+div[data-testid="stAlert"][kind="success"] [data-testid="stMarkdownContainer"] {
+    color: var(--status-green) !important;
+}
+
+/* Info messages */
+div[data-testid="stAlert"][kind="info"],
+.stInfo {
+    background-color: var(--paper-bg) !important;
+    border-left: 3px solid var(--accent-color) !important;
+    border-radius: 2px !important;
+    padding: var(--spacing-sm) var(--spacing-md) !important;
+    margin: var(--spacing-xs) 0 !important;
+}
+
+div[data-testid="stAlert"][kind="info"] [data-testid="stMarkdownContainer"] {
+    color: var(--accent-color) !important;
+}
+
+/* Warning messages */
+div[data-testid="stAlert"][kind="warning"],
+.stWarning {
+    background-color: var(--status-yellow-bg) !important;
+    border-left: 3px solid var(--status-yellow) !important;
+    border-radius: 2px !important;
+    padding: var(--spacing-sm) var(--spacing-md) !important;
+    margin: var(--spacing-xs) 0 !important;
+}
+
+div[data-testid="stAlert"][kind="warning"] [data-testid="stMarkdownContainer"] {
+    color: var(--status-yellow) !important;
+}
+
+/* Error messages */
+div[data-testid="stAlert"][kind="error"],
+.stError {
+    background-color: var(--status-red-bg) !important;
+    border-left: 3px solid var(--status-red) !important;
+    border-radius: 2px !important;
+    padding: var(--spacing-sm) var(--spacing-md) !important;
+    margin: var(--spacing-xs) 0 !important;
+}
+
+div[data-testid="stAlert"][kind="error"] [data-testid="stMarkdownContainer"] {
+    color: var(--status-red) !important;
+}
+
+/* ============================================================================
+   INPUT CONTROLS (Clean, minimal)
+   ============================================================================ */
+
+/* Text inputs */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+textarea {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.9375rem !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-medium) !important;
+    border-radius: 2px !important;
+    padding: 0.5rem 0.75rem !important;
+    background-color: var(--paper-white) !important;
+    transition: border-color 0.15s ease !important;
+}
+
+input:focus,
+textarea:focus {
+    border-color: var(--accent-color) !important;
+    outline: none !important;
+}
+
+/* Selectbox */
+div[data-baseweb="select"] {
+    border: 1px solid var(--border-medium) !important;
+    border-radius: 2px !important;
+}
+
+/* Slider */
+div[data-testid="stSlider"] [data-baseweb="slider"] {
+    color: var(--accent-color) !important;
+}
+
+/* ============================================================================
+   SIDEBAR (Minimal styling, preserve functionality)
+   ============================================================================ */
+
+section[data-testid="stSidebar"] {
+    background-color: var(--paper-bg) !important;
+    border-right: 1px solid var(--border-light) !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    color: var(--text-secondary) !important;
+}
+
+/* Preserve sidebar button functionality */
+section[data-testid="stSidebar"] button[kind="header"] {
+    all: revert !important;
+}
+
+/* ============================================================================
+   PLOTLY CHARTS (Clean modebar)
+   ============================================================================ */
+
+.modebar {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 2px !important;
+    padding: 2px !important;
+}
+
+.modebar-btn path {
+    fill: var(--text-secondary) !important;
+}
+
+.modebar-btn:hover path {
+    fill: var(--text-primary) !important;
+}
+
+/* ============================================================================
+   REGIME-SPECIFIC COLORS (Portfolio status indicators)
+   ============================================================================ */
+
+/* These are used in portfolio_risk UI for regime display */
+.regime-green {
+    color: var(--status-green) !important;
+}
+
+.regime-yellow {
+    color: var(--status-yellow) !important;
+}
+
+.regime-red {
+    color: var(--status-red) !important;
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+
+/* Centered content */
+.journal-centered {
+    max-width: var(--max-content-width);
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+}
+
+/* Subtle container */
+.journal-container {
+    background-color: var(--paper-white);
+    border: 1px solid var(--border-light);
+    border-radius: 2px;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Reading width (narrower for text-heavy content) */
+.journal-reading-width {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+/* ============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .main .block-container {
+        max-width: 100% !important;
+        padding-left: var(--spacing-sm) !important;
+        padding-right: var(--spacing-sm) !important;
+    }
+    
+    h1 {
+        font-size: 1.75rem !important;
+    }
+    
+    h2 {
+        font-size: 1.5rem !important;
+    }
+    
+    h3 {
+        font-size: 1.25rem !important;
+    }
+}
+
+/* ============================================================================
+   ACCESSIBILITY (High contrast maintained)
+   ============================================================================ */
+
+/* Focus indicators */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+    outline: 2px solid var(--accent-color) !important;
+    outline-offset: 2px !important;
+}
+
+/* Skip to content link (for screen readers) */
+.skip-to-content {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--accent-color);
+    color: white;
+    padding: 8px;
+    text-decoration: none;
+    z-index: 100;
+}
+
+.skip-to-content:focus {
+    top: 0;
+}
+
+/* ============================================================================
+   END OF JOURNAL THEME
+   ============================================================================ */
+
