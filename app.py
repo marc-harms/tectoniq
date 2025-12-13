@@ -1827,55 +1827,56 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Footer links (text-based hyperlinks instead of buttons)
+        # Footer links (text-based, styled as buttons to trigger dialogs)
         st.markdown("""
         <style>
-            .footer-links {
-                text-align: center;
-                font-family: 'Inter', sans-serif;
-                font-size: 0.875rem;
-                color: #6B6B6B;
-                padding: 0.5rem 0;
+            /* Style buttons to look like text links */
+            button[key^="footer_link_"] {
+                background: none !important;
+                border: none !important;
+                color: #5a6c7d !important;
+                text-decoration: none !important;
+                font-family: 'Inter', sans-serif !important;
+                font-size: 0.875rem !important;
+                font-weight: 500 !important;
+                padding: 0 0.5rem !important;
+                cursor: pointer !important;
+                box-shadow: none !important;
             }
-            .footer-links a {
-                color: #5a6c7d;
-                text-decoration: none;
-                font-weight: 500;
-                padding: 0 0.5rem;
+            button[key^="footer_link_"]:hover {
+                text-decoration: underline !important;
+                background: none !important;
             }
-            .footer-links a:hover {
-                text-decoration: underline;
-            }
-            .footer-links .separator {
+            .footer-separator {
                 color: #BDC3C7;
                 padding: 0 0.25rem;
+                font-size: 0.875rem;
             }
         </style>
-        <div class="footer-links">
-            <span id="footer-disclaimer-link" style="cursor: pointer;">Disclaimer</span>
-            <span class="separator">|</span>
-            <span id="footer-data-link" style="cursor: pointer;">Data Protection</span>
-            <span class="separator">|</span>
-            <span id="footer-imprint-link" style="cursor: pointer;">Imprint</span>
-            <span class="separator">|</span>
-            <span id="footer-news-link" style="cursor: pointer;">News</span>
-        </div>
         """, unsafe_allow_html=True)
         
-        # Hidden buttons to trigger dialogs (triggered by clicking links above)
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("", key="footer_disclaimer_hidden", help="Disclaimer"):
-                show_disclaimer_dialog()
-        with col2:
-            if st.button("", key="footer_data_hidden", help="Data Protection"):
-                show_data_protection_dialog()
-        with col3:
-            if st.button("", key="footer_imprint_hidden", help="Imprint"):
-                show_imprint_dialog()
-        with col4:
-            if st.button("", key="footer_news_hidden", help="News"):
-                show_news_dialog()
+        # Footer links as styled buttons (centered)
+        col_spacer1, col_center, col_spacer2 = st.columns([1, 2, 1])
+        with col_center:
+            cols = st.columns([1, 0.1, 1, 0.1, 1, 0.1, 1])
+            with cols[0]:
+                if st.button("Disclaimer", key="footer_link_disclaimer"):
+                    show_disclaimer_dialog()
+            with cols[1]:
+                st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
+            with cols[2]:
+                if st.button("Data Protection", key="footer_link_data"):
+                    show_data_protection_dialog()
+            with cols[3]:
+                st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
+            with cols[4]:
+                if st.button("Imprint", key="footer_link_imprint"):
+                    show_imprint_dialog()
+            with cols[5]:
+                st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
+            with cols[6]:
+                if st.button("News", key="footer_link_news"):
+                    show_news_dialog()
         
         # Stop rendering here for public users
         return
@@ -2301,55 +2302,56 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Legal page links (text-based hyperlinks instead of buttons)
+    # Legal page links (text-based, styled as buttons to trigger dialogs)
     st.markdown("""
     <style>
-        .footer-links {
-            text-align: center;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
-            color: #6B6B6B;
-            padding: 0.5rem 0;
+        /* Style buttons to look like text links */
+        button[key^="footer_link_auth_"] {
+            background: none !important;
+            border: none !important;
+            color: #5a6c7d !important;
+            text-decoration: none !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 0.875rem !important;
+            font-weight: 500 !important;
+            padding: 0 0.5rem !important;
+            cursor: pointer !important;
+            box-shadow: none !important;
         }
-        .footer-links a {
-            color: #5a6c7d;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 0 0.5rem;
+        button[key^="footer_link_auth_"]:hover {
+            text-decoration: underline !important;
+            background: none !important;
         }
-        .footer-links a:hover {
-            text-decoration: underline;
-        }
-        .footer-links .separator {
+        .footer-separator {
             color: #BDC3C7;
             padding: 0 0.25rem;
+            font-size: 0.875rem;
         }
     </style>
-    <div class="footer-links">
-        <span id="footer-disclaimer-link-auth" style="cursor: pointer;">Disclaimer</span>
-        <span class="separator">|</span>
-        <span id="footer-data-link-auth" style="cursor: pointer;">Data Protection</span>
-        <span class="separator">|</span>
-        <span id="footer-imprint-link-auth" style="cursor: pointer;">Imprint</span>
-        <span class="separator">|</span>
-        <span id="footer-news-link-auth" style="cursor: pointer;">News</span>
-    </div>
     """, unsafe_allow_html=True)
     
-    # Hidden buttons to trigger dialogs (triggered by clicking links above)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("", key="footer_disclaimer_auth_hidden", help="Disclaimer"):
-            show_disclaimer_dialog()
-    with col2:
-        if st.button("", key="footer_data_auth_hidden", help="Data Protection"):
-            show_data_protection_dialog()
-    with col3:
-        if st.button("", key="footer_imprint_auth_hidden", help="Imprint"):
-            show_imprint_dialog()
-    with col4:
-        if st.button("", key="footer_news_auth_hidden", help="News"):
-            show_news_dialog()
+    # Footer links as styled buttons (centered)
+    col_spacer1, col_center, col_spacer2 = st.columns([1, 2, 1])
+    with col_center:
+        cols = st.columns([1, 0.1, 1, 0.1, 1, 0.1, 1])
+        with cols[0]:
+            if st.button("Disclaimer", key="footer_link_auth_disclaimer"):
+                show_disclaimer_dialog()
+        with cols[1]:
+            st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
+        with cols[2]:
+            if st.button("Data Protection", key="footer_link_auth_data"):
+                show_data_protection_dialog()
+        with cols[3]:
+            st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
+        with cols[4]:
+            if st.button("Imprint", key="footer_link_auth_imprint"):
+                show_imprint_dialog()
+        with cols[5]:
+            st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
+        with cols[6]:
+            if st.button("News", key="footer_link_auth_news"):
+                show_news_dialog()
 
 
 if __name__ == "__main__":
