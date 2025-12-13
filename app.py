@@ -475,21 +475,41 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
         # Determine button layout based on authentication
         from auth_manager import is_authenticated
         
+        # Add custom CSS for reduced button size
+        st.markdown("""
+        <style>
+            /* Reduce Tectoniq News button size: 75% width, 50% height */
+            button[key="header_btn_news"] {
+                max-width: 75% !important;
+                padding: 0.25rem 0.625rem !important;
+                margin: 0 auto !important;
+                display: block !important;
+            }
+            
+            button[key="header_btn_portfolio"] {
+                max-width: 75% !important;
+                padding: 0.25rem 0.625rem !important;
+                margin: 0 auto !important;
+                display: block !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
         if is_authenticated():
             # Two buttons: Tectoniq News + Portfolio Analysis
             btn_col1, btn_col2 = st.columns(2)
             
             with btn_col1:
-                if st.button("Tectoniq News", key="header_btn_news", use_container_width=True):
+                if st.button("Tectoniq News", key="header_btn_news", use_container_width=False):
                     show_news_dialog()
             
             with btn_col2:
-                if st.button("Portfolio Analysis", key="header_btn_portfolio", use_container_width=True):
+                if st.button("Portfolio Analysis", key="header_btn_portfolio", use_container_width=False):
                     st.session_state.view_mode = "portfolio"
                     st.rerun()
         else:
             # Only one button: Tectoniq News (centered)
-            if st.button("Tectoniq News", key="header_btn_news", use_container_width=True):
+            if st.button("Tectoniq News", key="header_btn_news", use_container_width=False):
                 show_news_dialog()
     
     # ==========================================================================
@@ -1572,6 +1592,135 @@ def main():
     
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
+    # === CHECK AUTHENTICATION FOR MAIN CONTENT ===
+    from auth_manager import is_authenticated
+    
+    # If user is NOT logged in, show minimal interface
+    if not is_authenticated():
+        # Only show ticker suggestions and asset results (if any)
+        # TICKER SUGGESTIONS (if user searched by company name)
+        if 'ticker_suggestions' in st.session_state and st.session_state.ticker_suggestions:
+            col_left, col_center, col_right = st.columns([1, 2, 1])
+            with col_center:
+                st.info("Not a ticker symbol. Did you mean one of these?")
+            
+            st.markdown("#### Select a ticker:")
+            suggestions = st.session_state.ticker_suggestions[:6]
+            
+            num_cols = min(3, len(suggestions))
+            cols = st.columns(num_cols)
+            
+            for i, suggestion in enumerate(suggestions):
+                col_idx = i % num_cols
+                ticker = suggestion.get('ticker', '') or suggestion.get('symbol', '')
+                
+                if not ticker:
+                    continue
+                    
+                name = suggestion.get('name', ticker)[:25]
+                exchange = suggestion.get('exchange', '')
+                
+                with cols[col_idx]:
+                    btn_label = f"{ticker}\n{name}"
+                    if exchange:
+                        btn_label += f"\n({exchange})"
+                    
+                    if st.button(btn_label, key=f"suggest_{ticker}_{i}", use_container_width=True):
+                        st.session_state.ticker_suggestions = []
+                        st.session_state.current_ticker = ticker
+                        
+                        with st.spinner(f"Analyzing {ticker}..."):
+                            try:
+                                results = run_analysis([ticker])
+                                if results and len(results) > 0:
+                                    st.session_state.scan_results = results
+                                    st.session_state.selected_asset = 0
+                                    st.session_state.view_mode = "asset"
+                                    st.rerun()
+                                else:
+                                    st.error(f"No data available for {ticker}.")
+                            except Exception as e:
+                                st.error(f"Error analyzing {ticker}: {str(e)}")
+            
+            if st.button("Clear suggestions", key="clear_suggestions"):
+                st.session_state.ticker_suggestions = []
+                st.rerun()
+        
+        # SHOW ASSET RESULTS (if available)
+        if 'scan_results' in st.session_state and st.session_state.scan_results:
+            results = st.session_state.scan_results
+            if results and len(results) > 0:
+                result = results[st.session_state.get('selected_asset', 0)]
+                
+                # Display current asset state
+                st.markdown("---")
+                st.markdown(f"### Current State: {result['symbol']}")
+                
+                # Show regime and criticality
+                regime = result.get('regime', {})
+                regime_name = regime.get('name', 'UNKNOWN')
+                regime_color = regime.get('color', '#666666')
+                criticality = result.get('criticality', 0)
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Asset", result['symbol'])
+                with col2:
+                    st.markdown(f"**Regime:** <span style='color: {regime_color}; font-weight: 700;'>{regime_name}</span>", unsafe_allow_html=True)
+                with col3:
+                    st.metric("Criticality", f"{criticality}/100")
+                
+                st.caption("Sign up for free to access full analysis and portfolio tracking.")
+        
+        # Skip to footer for public users
+        st.markdown("<div style='height: 3rem;'></div>", unsafe_allow_html=True)
+        st.markdown("---")
+        
+        st.markdown("""
+        <div style="text-align: center; padding: 1rem 0; font-family: 'Merriweather', serif; font-size: 0.85rem; color: #666;">
+            <p style="margin: 0 0 12px 0;">© 2025 TECTONIQ. All rights reserved.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Footer buttons
+        st.markdown("""
+        <style>
+            button[key="footer_disclaimer"],
+            button[key="footer_data_protection"],
+            button[key="footer_imprint"] {
+                max-width: 75% !important;
+                padding: 0.25rem 0.625rem !important;
+                margin: 0 auto !important;
+                display: block !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_spacer2 = st.columns([2, 1, 0.3, 1, 0.3, 1, 2])
+        
+        with col1:
+            if st.button("Disclaimer", key="footer_disclaimer", use_container_width=False):
+                show_disclaimer_dialog()
+        
+        with col_sep1:
+            st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
+        
+        with col2:
+            if st.button("Data Protection", key="footer_data_protection", use_container_width=False):
+                show_data_protection_dialog()
+        
+        with col_sep2:
+            st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
+        
+        with col3:
+            if st.button("Imprint", key="footer_imprint", use_container_width=False):
+                show_imprint_dialog()
+        
+        # Stop rendering here for public users
+        return
+    
+    # === AUTHENTICATED USERS: FULL CONTENT ===
+    
     # === PORTFOLIO VIEW (if toggled on) ===
     if st.session_state.get('show_portfolio', False):
         with st.container(border=True):
@@ -1992,24 +2141,38 @@ def main():
     """, unsafe_allow_html=True)
     
     # Legal page buttons (open as modal dialogs)
+    # Add custom CSS for reduced footer button size: 75% width, 50% height
+    st.markdown("""
+    <style>
+        button[key="footer_disclaimer"],
+        button[key="footer_data_protection"],
+        button[key="footer_imprint"] {
+            max-width: 75% !important;
+            padding: 0.25rem 0.625rem !important;
+            margin: 0 auto !important;
+            display: block !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_spacer2 = st.columns([2, 1, 0.3, 1, 0.3, 1, 2])
     
     with col1:
-        if st.button("Disclaimer", key="footer_disclaimer", use_container_width=True):
+        if st.button("Disclaimer", key="footer_disclaimer", use_container_width=False):
             show_disclaimer_dialog()
     
     with col_sep1:
         st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
     
     with col2:
-        if st.button("Data Protection", key="footer_data_protection", use_container_width=True):
+        if st.button("Data Protection", key="footer_data_protection", use_container_width=False):
             show_data_protection_dialog()
     
     with col_sep2:
         st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
     
     with col3:
-        if st.button("Imprint", key="footer_imprint", use_container_width=True):
+        if st.button("Imprint", key="footer_imprint", use_container_width=False):
             show_imprint_dialog()
 
 
