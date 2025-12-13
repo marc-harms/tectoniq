@@ -1827,46 +1827,54 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Footer buttons (reduced height by 50%)
+        # Footer links (text-based hyperlinks instead of buttons)
         st.markdown("""
         <style>
-            button[key="footer_disclaimer"],
-            button[key="footer_data_protection"],
-            button[key="footer_imprint"],
-            button[key="footer_news"] {
-                max-width: 75% !important;
-                padding: 0.125rem 0.625rem !important;
-                margin: 0 auto !important;
-                display: block !important;
+            .footer-links {
+                text-align: center;
+                font-family: 'Inter', sans-serif;
+                font-size: 0.875rem;
+                color: #6B6B6B;
+                padding: 0.5rem 0;
+            }
+            .footer-links a {
+                color: #5a6c7d;
+                text-decoration: none;
+                font-weight: 500;
+                padding: 0 0.5rem;
+            }
+            .footer-links a:hover {
+                text-decoration: underline;
+            }
+            .footer-links .separator {
+                color: #BDC3C7;
+                padding: 0 0.25rem;
             }
         </style>
+        <div class="footer-links">
+            <span id="footer-disclaimer-link" style="cursor: pointer;">Disclaimer</span>
+            <span class="separator">|</span>
+            <span id="footer-data-link" style="cursor: pointer;">Data Protection</span>
+            <span class="separator">|</span>
+            <span id="footer-imprint-link" style="cursor: pointer;">Imprint</span>
+            <span class="separator">|</span>
+            <span id="footer-news-link" style="cursor: pointer;">News</span>
+        </div>
         """, unsafe_allow_html=True)
         
-        col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_sep3, col4, col_spacer2 = st.columns([1.5, 1, 0.2, 1, 0.2, 1, 0.2, 1, 1.5])
-        
+        # Hidden buttons to trigger dialogs (triggered by clicking links above)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            if st.button("Disclaimer", key="footer_disclaimer", use_container_width=False):
+            if st.button("", key="footer_disclaimer_hidden", help="Disclaimer"):
                 show_disclaimer_dialog()
-        
-        with col_sep1:
-            st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
-        
         with col2:
-            if st.button("Data Protection", key="footer_data_protection", use_container_width=False):
+            if st.button("", key="footer_data_hidden", help="Data Protection"):
                 show_data_protection_dialog()
-        
-        with col_sep2:
-            st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
-        
         with col3:
-            if st.button("Imprint", key="footer_imprint", use_container_width=False):
+            if st.button("", key="footer_imprint_hidden", help="Imprint"):
                 show_imprint_dialog()
-        
-        with col_sep3:
-            st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
-        
         with col4:
-            if st.button("News", key="footer_news", use_container_width=False):
+            if st.button("", key="footer_news_hidden", help="News"):
                 show_news_dialog()
         
         # Stop rendering here for public users
@@ -2293,47 +2301,54 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Legal page buttons (open as modal dialogs)
-    # Add custom CSS for reduced footer button size: 75% width, height reduced by 50%
+    # Legal page links (text-based hyperlinks instead of buttons)
     st.markdown("""
     <style>
-        button[key="footer_disclaimer"],
-        button[key="footer_data_protection"],
-        button[key="footer_imprint"],
-        button[key="footer_news_auth"] {
-            max-width: 75% !important;
-            padding: 0.125rem 0.625rem !important;
-            margin: 0 auto !important;
-            display: block !important;
+        .footer-links {
+            text-align: center;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem;
+            color: #6B6B6B;
+            padding: 0.5rem 0;
+        }
+        .footer-links a {
+            color: #5a6c7d;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0 0.5rem;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        .footer-links .separator {
+            color: #BDC3C7;
+            padding: 0 0.25rem;
         }
     </style>
+    <div class="footer-links">
+        <span id="footer-disclaimer-link-auth" style="cursor: pointer;">Disclaimer</span>
+        <span class="separator">|</span>
+        <span id="footer-data-link-auth" style="cursor: pointer;">Data Protection</span>
+        <span class="separator">|</span>
+        <span id="footer-imprint-link-auth" style="cursor: pointer;">Imprint</span>
+        <span class="separator">|</span>
+        <span id="footer-news-link-auth" style="cursor: pointer;">News</span>
+    </div>
     """, unsafe_allow_html=True)
     
-    col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_sep3, col4, col_spacer2 = st.columns([1.5, 1, 0.2, 1, 0.2, 1, 0.2, 1, 1.5])
-    
+    # Hidden buttons to trigger dialogs (triggered by clicking links above)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if st.button("Disclaimer", key="footer_disclaimer", use_container_width=False):
+        if st.button("", key="footer_disclaimer_auth_hidden", help="Disclaimer"):
             show_disclaimer_dialog()
-    
-    with col_sep1:
-        st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
-    
     with col2:
-        if st.button("Data Protection", key="footer_data_protection", use_container_width=False):
+        if st.button("", key="footer_data_auth_hidden", help="Data Protection"):
             show_data_protection_dialog()
-    
-    with col_sep2:
-        st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
-    
     with col3:
-        if st.button("Imprint", key="footer_imprint", use_container_width=False):
+        if st.button("", key="footer_imprint_auth_hidden", help="Imprint"):
             show_imprint_dialog()
-    
-    with col_sep3:
-        st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
-    
     with col4:
-        if st.button("News", key="footer_news_auth", use_container_width=False):
+        if st.button("", key="footer_news_auth_hidden", help="News"):
             show_news_dialog()
 
 
