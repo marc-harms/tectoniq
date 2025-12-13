@@ -38,6 +38,7 @@ from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_
 from ui_simulation import render_dca_simulation
 from ui_detail import render_detail_panel, render_regime_persistence_chart, render_current_regime_outlook
 from ui_auth import render_disclaimer, render_login_dialog, render_signup_dialog, render_education_landing
+from ui_portfolio_risk import render_portfolio_risk_view, render_portfolio_input_simple, render_asset_drill_down_header
 from hero_card_visual_v2 import render_hero_specimen
 from auth_manager import (
     is_authenticated, logout, get_current_user_id, get_current_user_email,
@@ -489,45 +490,29 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     
     st.markdown(masthead_css + masthead_html, unsafe_allow_html=True)
     
-    # === CONTROL DECK (Search & Nav) ===
+    # === CONTROL DECK (Navigation) ===
+    # Phase 3: Simplified navigation - Portfolio-first
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
-    # Control Deck Layout: Row 1 - Search | Deep Dive | Simulation
-    col_search, col_dive, col_sim = st.columns([3, 1, 1])
+    # Simple view toggle: Portfolio / Asset
+    col_portfolio, col_asset = st.columns([1, 1])
     
-    with col_search:
-        # Clear search field if asset is already selected
-        has_active_asset = 'scan_results' in st.session_state and st.session_state.scan_results
-        if has_active_asset and 'header_search' in st.session_state and st.session_state.header_search:
-            st.session_state.header_search = ""
+    with col_portfolio:
+        button_type = "primary" if st.session_state.view_mode == "portfolio" else "secondary"
+        if st.button("📊 Portfolio Risk", key="nav_portfolio", use_container_width=True, type=button_type):
+            st.session_state.view_mode = "portfolio"
+            st.rerun()
+    
+    with col_asset:
+        button_type = "primary" if st.session_state.view_mode == "asset" else "secondary"
+        # Only show asset button if we have a selected asset
+        asset_label = "Asset View"
+        if 'current_ticker' in st.session_state and st.session_state.current_ticker:
+            asset_label = f"{st.session_state.current_ticker}"
         
-        placeholder_text = "Search ticker (e.g., AAPL, BTC-USD) and press Enter"
-        
-        # Search field
-        search_query = st.text_input(
-            "Search Asset",
-            placeholder=placeholder_text,
-            label_visibility="collapsed",
-            key="header_search",
-            on_change=lambda: handle_header_search(
-                st.session_state.get('header_search', ''),
-                validate_ticker_func,
-                search_ticker_func,
-                run_analysis_func
-            )
-        )
-    
-    with col_dive:
-        if st.button("📊 Deep Dive", key="header_btn_deep_dive", use_container_width=True):
-            if 'scan_results' in st.session_state and st.session_state.scan_results:
-                st.session_state.analysis_mode = "deep_dive"
-                st.rerun()
-    
-    with col_sim:
-        if st.button("🎯 Simulation", key="header_btn_simulation", use_container_width=True):
-            if 'scan_results' in st.session_state and st.session_state.scan_results:
-                st.session_state.analysis_mode = "simulation"
-                st.rerun()
+        if st.button(f"🔍 {asset_label}", key="nav_asset", use_container_width=True, type=button_type):
+            st.session_state.view_mode = "asset"
+            st.rerun()
     
     st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
     
@@ -1373,6 +1358,93 @@ def show_news_dialog():
 
 
 # =============================================================================
+# PHASE 3: ASSET ANALYSIS VIEW (SECONDARY)
+# =============================================================================
+
+def render_asset_analysis_view(ticker_symbol: str) -> None:
+    """
+    Render asset analysis for a specific ticker (Phase 3: SECONDARY VIEW).
+    
+    This is the asset drill-down view - informational only.
+    Portfolio is the primary product.
+    
+    Args:
+        ticker_symbol: Asset ticker to analyze
+    """
+    from logic import DataFetcher
+    
+    # Asset view header (informational only label)
+    render_asset_drill_down_header()
+    
+    st.markdown(f"## {ticker_symbol}")
+    
+    tier = get_user_tier()
+    is_dark = st.session_state.get('dark_mode', False)
+    
+    # Fetch data
+    fetcher = DataFetcher(cache_enabled=True)
+    
+    with st.spinner(f"Loading data for {ticker_symbol}..."):
+        try:
+            df = fetcher.fetch_data(ticker_symbol)
+            
+            if df is None or df.empty:
+                st.error(f"No data available for {ticker_symbol}")
+                return
+            
+            # Get current market state
+            current_state = get_current_market_state(df, strategy_mode="defensive")
+            
+            # Get basic info
+            price = df['close'].iloc[-1] if 'close' in df.columns else 0.0
+            change = ((df['close'].iloc[-1] / df['close'].iloc[-2]) - 1) * 100 if len(df) >= 2 else 0.0
+            
+            criticality = current_state.get('criticality_score', 0)
+            trend = current_state.get('trend_signal', 'Unknown')
+            is_invested = current_state.get('is_invested', True)
+            vol_percentile = current_state.get('raw_data', {}).get('volatility', 0) * 100
+            
+            # Render hero card (simplified - no fancy regime names)
+            st.markdown("### Current State")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Price", f"${price:.2f}", f"{change:+.2f}%")
+            
+            with col2:
+                regime_color = "#27ae60" if criticality < 40 else "#f39c12" if criticality < 70 else "#e74c3c"
+                regime_label = "STABLE" if criticality < 40 else "ELEVATED" if criticality < 70 else "CRITICAL"
+                st.markdown(f"**Regime:** <span style='color: {regime_color}; font-weight: 700;'>{regime_label}</span>", unsafe_allow_html=True)
+            
+            with col3:
+                st.metric("Criticality", f"{int(criticality)}/100")
+            
+            st.markdown("---")
+            
+            # Premium: Show charts
+            if tier == "premium":
+                st.markdown("### Historical Analysis")
+                
+                analyzer = SOCAnalyzer(df, ticker_symbol, {})
+                figs = analyzer.get_plotly_figures(dark_mode=is_dark)
+                st.plotly_chart(figs['chart3'], use_container_width=True)
+                
+                # Advanced analytics
+                render_advanced_analytics(df, is_dark=is_dark)
+                
+            else:
+                # Free/Public: Upgrade prompt
+                st.info("🔒 **Historical charts and advanced analytics** require Premium")
+                show_upgrade_dialog("Asset Analysis", tier)
+                
+        except Exception as e:
+            st.error(f"Error loading asset data: {str(e)}")
+            import traceback
+            st.caption(f"```\n{traceback.format_exc()}\n```")
+
+
+# =============================================================================
 # MAIN APPLICATION
 # =============================================================================
 
@@ -1409,6 +1481,10 @@ def main():
         st.session_state.show_login_dialog = False
     if 'show_signup_dialog' not in st.session_state:
         st.session_state.show_signup_dialog = False
+    
+    # Phase 3: Portfolio-first view mode
+    if 'view_mode' not in st.session_state:
+        st.session_state.view_mode = "portfolio"  # Default to portfolio view
     
     # Initialize tier based on authentication status
     if is_authenticated():
@@ -1698,7 +1774,52 @@ def main():
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
     # === MAIN CONTENT AREA (Dynamic) ===
-    if 'scan_results' not in st.session_state or not st.session_state.scan_results:
+    
+    # Phase 3: Portfolio-First UX
+    # Default view is PORTFOLIO, assets are opt-in secondary
+    
+    if st.session_state.view_mode == "portfolio":
+        # === PORTFOLIO VIEW (DEFAULT) ===
+        st.markdown("# Portfolio Risk Mirror")
+        st.caption("Real-time structural risk assessment")
+        
+        st.markdown("---")
+        
+        # Portfolio input/configuration
+        user_portfolio = render_portfolio_input_simple()
+        
+        if user_portfolio:
+            # Render portfolio risk view (3-layer hierarchy)
+            render_portfolio_risk_view(user_portfolio)
+            
+            # Button to drill down into selected asset
+            if 'drill_down_asset' in st.session_state and st.session_state.drill_down_asset:
+                st.markdown("---")
+                if st.button(f"📊 View Detailed Analysis for {st.session_state.drill_down_asset}", 
+                           use_container_width=True, type="secondary"):
+                    # Switch to asset view for selected asset
+                    st.session_state.view_mode = "asset"
+                    st.session_state.current_ticker = st.session_state.drill_down_asset
+                    st.rerun()
+        
+    elif st.session_state.view_mode == "asset":
+        # === ASSET VIEW (SECONDARY/OPT-IN) ===
+        render_asset_drill_down_header()
+        
+        # Back to portfolio button
+        if st.button("← Back to Portfolio", key="back_to_portfolio"):
+            st.session_state.view_mode = "portfolio"
+            st.rerun()
+        
+        # Show asset analysis if ticker is set
+        if st.session_state.current_ticker:
+            # Render existing asset analysis (preserved from Phase 2)
+            render_asset_analysis_view(st.session_state.current_ticker)
+        else:
+            st.info("No asset selected. Return to portfolio view.")
+            
+    # Legacy: Maintain compatibility with old flow
+    elif 'scan_results' not in st.session_state or not st.session_state.scan_results:
         # CONDITION A: No Asset Selected - Show Education Landing
         render_education_landing(run_analysis)
     else:
