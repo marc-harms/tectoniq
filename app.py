@@ -1792,7 +1792,7 @@ def main():
                         </div>
                         
                         <div class="hero-cta">
-                            Sign up for free to access full analysis and portfolio tracking
+                            {cta_text}
                         </div>
                     </div>
                 </body>
