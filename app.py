@@ -1657,16 +1657,23 @@ def main():
                 st.markdown(f"### Current State: {result['symbol']}")
                 
                 # Show regime and criticality
-                regime = result.get('regime', {})
-                regime_name = regime.get('name', 'UNKNOWN')
-                regime_color = regime.get('color', '#666666')
-                criticality = result.get('criticality', 0)
+                # Note: result['signal'] contains the regime string
+                regime_text = result.get('signal', 'UNKNOWN')
+                criticality = result.get('criticality_score', 0)
+                
+                # Get color based on criticality
+                if criticality >= 70:
+                    regime_color = "#FF6600"  # Red
+                elif criticality >= 40:
+                    regime_color = "#FFB800"  # Yellow
+                else:
+                    regime_color = "#00C864"  # Green
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Asset", result['symbol'])
                 with col2:
-                    st.markdown(f"**Regime:** <span style='color: {regime_color}; font-weight: 700;'>{regime_name}</span>", unsafe_allow_html=True)
+                    st.markdown(f"**Regime:** <span style='color: {regime_color}; font-weight: 700;'>{regime_text}</span>", unsafe_allow_html=True)
                 with col3:
                     st.metric("Criticality", f"{criticality}/100")
                 
