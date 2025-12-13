@@ -79,21 +79,21 @@ def render_dca_simulation(tickers: List[str]) -> None:
     st.markdown("#### Reality Settings")
     st.caption("Adjust trading costs and cash interest for realistic simulation")
     
-        col_fee, col_interest = st.columns(2)
-        
-        with col_fee:
-            trading_fee_pct = st.slider(
-                "Trading Fee & Slippage (%):",
-                min_value=0.0, max_value=2.0, value=0.5, step=0.1,
-                format="%.1f%%"
-            )
-        
-        with col_interest:
-            interest_rate_annual = st.slider(
-                "Interest on Cash (% p.a.):",
-                min_value=0.0, max_value=5.0, value=3.0, step=0.5,
-                format="%.1f%%"
-            )
+    col_fee, col_interest = st.columns(2)
+    
+    with col_fee:
+        trading_fee_pct = st.slider(
+            "Trading Fee & Slippage (%):",
+            min_value=0.0, max_value=2.0, value=0.5, step=0.1,
+            format="%.1f%%"
+        )
+    
+    with col_interest:
+        interest_rate_annual = st.slider(
+            "Interest on Cash (% p.a.):",
+            min_value=0.0, max_value=5.0, value=3.0, step=0.5,
+            format="%.1f%%"
+        )
     
     # Run simulation button - centered and smaller
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
