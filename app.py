@@ -1693,120 +1693,136 @@ def main():
                     regime_color = "#00C864"  # Green
                     regime_bg = "rgba(0, 200, 100, 0.1)"
                 
-                # Hero card HTML
-                hero_card_html = f"""
-                <style>
-                    .asset-hero-card {{
-                        max-width: 700px;
-                        margin: 2rem auto;
-                        border: 1px solid #E0E0E0;
-                        border-radius: 4px;
-                        background-color: #FFFFFF;
-                        padding: 2rem;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-                    }}
-                    .hero-top-row {{
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        margin-bottom: 2rem;
-                    }}
-                    .hero-left {{
-                        flex: 1;
-                    }}
-                    .hero-asset-name {{
-                        font-family: 'Libre Baskerville', serif;
-                        font-size: 1.75rem;
-                        font-weight: 700;
-                        color: #2B2B2B;
-                        margin: 0 0 0.25rem 0;
-                    }}
-                    .hero-ticker {{
-                        font-family: 'Inter', sans-serif;
-                        font-size: 0.875rem;
-                        color: #6B6B6B;
-                        font-weight: 500;
-                        letter-spacing: 0.05em;
-                    }}
-                    .hero-right {{
-                        text-align: right;
-                    }}
-                    .hero-criticality-label {{
-                        font-family: 'Inter', sans-serif;
-                        font-size: 0.75rem;
-                        color: #6B6B6B;
-                        text-transform: uppercase;
-                        letter-spacing: 0.1em;
-                        margin-bottom: 0.25rem;
-                    }}
-                    .hero-criticality-value {{
-                        font-family: 'Inter', sans-serif;
-                        font-size: 2rem;
-                        font-weight: 700;
-                        color: #2B2B2B;
-                    }}
-                    .hero-criticality-max {{
-                        font-size: 1rem;
-                        color: #6B6B6B;
-                        font-weight: 400;
-                    }}
-                    .hero-regime-bar {{
-                        background-color: {regime_bg};
-                        border-left: 4px solid {regime_color};
-                        padding: 1rem 1.5rem;
-                        text-align: center;
-                        border-radius: 2px;
-                    }}
-                    .hero-regime-label {{
-                        font-family: 'Inter', sans-serif;
-                        font-size: 0.75rem;
-                        color: #6B6B6B;
-                        text-transform: uppercase;
-                        letter-spacing: 0.1em;
-                        margin-bottom: 0.5rem;
-                    }}
-                    .hero-regime-value {{
-                        font-family: 'Libre Baskerville', serif;
-                        font-size: 1.5rem;
-                        font-weight: 700;
-                        color: {regime_color};
-                    }}
-                    .hero-cta {{
-                        text-align: center;
-                        margin-top: 1.5rem;
-                        font-family: 'Inter', sans-serif;
-                        font-size: 0.875rem;
-                        color: #6B6B6B;
-                        font-style: italic;
-                    }}
-                </style>
+                # Hero card HTML (using streamlit components for reliable rendering)
+                import streamlit.components.v1 as components
                 
-                <div class="asset-hero-card">
-                    <div class="hero-top-row">
-                        <div class="hero-left">
-                            <div class="hero-asset-name">{asset_name}</div>
-                            <div class="hero-ticker">{ticker}</div>
-                        </div>
-                        <div class="hero-right">
-                            <div class="hero-criticality-label">Criticality</div>
-                            <div class="hero-criticality-value">
-                                {criticality}<span class="hero-criticality-max"> / 100</span>
+                hero_card_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+                    <style>
+                        body {{
+                            margin: 0;
+                            padding: 0;
+                            font-family: 'Inter', sans-serif;
+                            background: transparent;
+                        }}
+                        .asset-hero-card {{
+                            max-width: 700px;
+                            margin: 2rem auto;
+                            border: 1px solid #E0E0E0;
+                            border-radius: 4px;
+                            background-color: #FFFFFF;
+                            padding: 2rem;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                        }}
+                        .hero-top-row {{
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            margin-bottom: 2rem;
+                        }}
+                        .hero-left {{
+                            flex: 1;
+                        }}
+                        .hero-asset-name {{
+                            font-family: 'Libre Baskerville', serif;
+                            font-size: 1.75rem;
+                            font-weight: 700;
+                            color: #2B2B2B;
+                            margin: 0 0 0.25rem 0;
+                        }}
+                        .hero-ticker {{
+                            font-family: 'Inter', sans-serif;
+                            font-size: 0.875rem;
+                            color: #6B6B6B;
+                            font-weight: 500;
+                            letter-spacing: 0.05em;
+                        }}
+                        .hero-right {{
+                            text-align: right;
+                        }}
+                        .hero-criticality-label {{
+                            font-family: 'Inter', sans-serif;
+                            font-size: 0.75rem;
+                            color: #6B6B6B;
+                            text-transform: uppercase;
+                            letter-spacing: 0.1em;
+                            margin-bottom: 0.25rem;
+                        }}
+                        .hero-criticality-value {{
+                            font-family: 'Inter', sans-serif;
+                            font-size: 2rem;
+                            font-weight: 700;
+                            color: #2B2B2B;
+                        }}
+                        .hero-criticality-max {{
+                            font-size: 1rem;
+                            color: #6B6B6B;
+                            font-weight: 400;
+                        }}
+                        .hero-regime-bar {{
+                            background-color: {regime_bg};
+                            border-left: 4px solid {regime_color};
+                            padding: 1rem 1.5rem;
+                            text-align: center;
+                            border-radius: 2px;
+                        }}
+                        .hero-regime-label {{
+                            font-family: 'Inter', sans-serif;
+                            font-size: 0.75rem;
+                            color: #6B6B6B;
+                            text-transform: uppercase;
+                            letter-spacing: 0.1em;
+                            margin-bottom: 0.5rem;
+                        }}
+                        .hero-regime-value {{
+                            font-family: 'Libre Baskerville', serif;
+                            font-size: 1.5rem;
+                            font-weight: 700;
+                            color: {regime_color};
+                        }}
+                        .hero-cta {{
+                            text-align: center;
+                            margin-top: 1.5rem;
+                            font-family: 'Inter', sans-serif;
+                            font-size: 0.875rem;
+                            color: #6B6B6B;
+                            font-style: italic;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="asset-hero-card">
+                        <div class="hero-top-row">
+                            <div class="hero-left">
+                                <div class="hero-asset-name">{asset_name}</div>
+                                <div class="hero-ticker">{ticker}</div>
+                            </div>
+                            <div class="hero-right">
+                                <div class="hero-criticality-label">Criticality</div>
+                                <div class="hero-criticality-value">
+                                    {criticality}<span class="hero-criticality-max"> / 100</span>
+                                </div>
                             </div>
                         </div>
+                        
+                        <div class="hero-regime-bar">
+                            <div class="hero-regime-label">Regime Status</div>
+                            <div class="hero-regime-value">{regime_text}</div>
+                        </div>
+                        
+                        <div class="hero-cta">
+                            Sign up for free to access full analysis and portfolio tracking
+                        </div>
                     </div>
-                    
-                    <div class="hero-regime-bar">
-                        <div class="hero-regime-label">Regime Status</div>
-                        <div class="hero-regime-value">{regime_text}</div>
-                    </div>
-                    
-                    <div class="hero-cta">
-                        Sign up for free to access full analysis and portfolio tracking
-                    </div>
-                </div>
+                </body>
+                </html>
                 """
                 
-                st.markdown(hero_card_html, unsafe_allow_html=True)
+                # Render as HTML component (more reliable than st.markdown for complex HTML)
+                components.html(hero_card_html, height=350, scrolling=False)
         
         # Skip to footer for public users
         st.markdown("<div style='height: 3rem;'></div>", unsafe_allow_html=True)
