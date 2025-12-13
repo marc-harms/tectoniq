@@ -348,43 +348,81 @@ def suggest_ticker_correction(invalid_symbol: str) -> Optional[str]:
     Returns:
         Suggested ticker symbol or None
     """
-    # Common company name to ticker mappings
+    # Common company name to ticker mappings (extensive list)
     common_mappings = {
-        'NVIDIA': 'NVDA',
-        'STRYKER': 'SYK',
-        'APPLE': 'AAPL',
-        'MICROSOFT': 'MSFT',
-        'GOOGLE': 'GOOGL',
-        'FACEBOOK': 'META',
-        'AMAZON': 'AMZN',
-        'TESLA': 'TSLA',
-        'NETFLIX': 'NFLX',
-        'INTEL': 'INTC',
-        'AMD': 'AMD',
-        'BOEING': 'BA',
-        'WALMART': 'WMT',
-        'DISNEY': 'DIS',
-        'COCA-COLA': 'KO',
-        'PEPSI': 'PEP',
-        'MCDONALD': 'MCD',
-        'VISA': 'V',
-        'MASTERCARD': 'MA',
-        'PAYPAL': 'PYPL',
-        'BITCOIN': 'BTC-USD',
-        'ETHEREUM': 'ETH-USD'
+        # Technology
+        'NVIDIA': 'NVDA', 'NVIDA': 'NVDA',
+        'APPLE': 'AAPL', 'APPL': 'AAPL',
+        'MICROSOFT': 'MSFT', 'MS': 'MSFT',
+        'GOOGLE': 'GOOGL', 'ALPHABET': 'GOOGL',
+        'FACEBOOK': 'META', 'META': 'META',
+        'AMAZON': 'AMZN', 'AMZN': 'AMZN',
+        'TESLA': 'TSLA', 'TSLA': 'TSLA',
+        'NETFLIX': 'NFLX', 'NFLX': 'NFLX',
+        'INTEL': 'INTC', 'INTC': 'INTC',
+        'AMD': 'AMD', 'ADVANCED MICRO': 'AMD',
+        'ORACLE': 'ORCL', 'ORCL': 'ORCL',
+        'SALESFORCE': 'CRM', 'CRM': 'CRM',
+        'ADOBE': 'ADBE', 'ADBE': 'ADBE',
+        'IBM': 'IBM', 'INTERNATIONAL BUSINESS': 'IBM',
+        'CISCO': 'CSCO', 'CSCO': 'CSCO',
+        'QUALCOMM': 'QCOM', 'QCOM': 'QCOM',
+        
+        # Healthcare
+        'STRYKER': 'SYK', 'SYK': 'SYK',
+        'JOHNSON': 'JNJ', 'J&J': 'JNJ', 'JNJ': 'JNJ',
+        'UNITEDHEALTH': 'UNH', 'UNITED HEALTH': 'UNH', 'UNH': 'UNH',
+        'PFIZER': 'PFE', 'PFE': 'PFE',
+        'MERCK': 'MRK', 'MRK': 'MRK',
+        'ABBVIE': 'ABBV', 'ABBV': 'ABBV',
+        'BRISTOL': 'BMY', 'BMY': 'BMY',
+        
+        # Finance
+        'JPMORGAN': 'JPM', 'JP MORGAN': 'JPM', 'JPM': 'JPM',
+        'BANK OF AMERICA': 'BAC', 'BAC': 'BAC', 'BOA': 'BAC',
+        'WELLS FARGO': 'WFC', 'WFC': 'WFC',
+        'GOLDMAN': 'GS', 'GOLDMAN SACHS': 'GS', 'GS': 'GS',
+        'MORGAN STANLEY': 'MS', 'MS': 'MS',
+        'VISA': 'V', 'V': 'V',
+        'MASTERCARD': 'MA', 'MA': 'MA',
+        'PAYPAL': 'PYPL', 'PYPL': 'PYPL',
+        'AMERICAN EXPRESS': 'AXP', 'AMEX': 'AXP', 'AXP': 'AXP',
+        
+        # Consumer
+        'BOEING': 'BA', 'BA': 'BA',
+        'WALMART': 'WMT', 'WMT': 'WMT',
+        'DISNEY': 'DIS', 'DIS': 'DIS',
+        'COCA-COLA': 'KO', 'COKE': 'KO', 'KO': 'KO',
+        'PEPSI': 'PEP', 'PEPSICO': 'PEP', 'PEP': 'PEP',
+        'MCDONALD': 'MCD', 'MCDONALDS': 'MCD', 'MCD': 'MCD',
+        'NIKE': 'NKE', 'NKE': 'NKE',
+        'STARBUCKS': 'SBUX', 'SBUX': 'SBUX',
+        'HOME DEPOT': 'HD', 'HD': 'HD',
+        
+        # Crypto
+        'BITCOIN': 'BTC-USD', 'BTC': 'BTC-USD',
+        'ETHEREUM': 'ETH-USD', 'ETH': 'ETH-USD',
+        
+        # ETFs
+        'S&P': 'SPY', 'S&P 500': 'SPY', 'SP500': 'SPY',
+        'NASDAQ': 'QQQ', 'NASDAQ 100': 'QQQ',
+        'DOW': 'DIA', 'DOW JONES': 'DIA',
+        'RUSSELL': 'IWM', 'RUSSELL 2000': 'IWM'
     }
     
-    # Check for partial matches
+    # Check for matches (case-insensitive)
     invalid_upper = invalid_symbol.upper().strip()
     
     # Exact match
     if invalid_upper in common_mappings:
         return common_mappings[invalid_upper]
     
-    # Partial match
+    # Partial match (more flexible)
     for name, ticker in common_mappings.items():
-        if name in invalid_upper or invalid_upper in name:
-            return ticker
+        # Check if search term is in company name
+        if len(invalid_upper) >= 3:  # Only for 3+ character searches
+            if invalid_upper in name or name in invalid_upper:
+                return ticker
     
     return None
 
@@ -406,22 +444,37 @@ def compute_portfolio_state_from_user_input(user_portfolio: List[Dict[str, float
     # Fetch data and compute states for each asset
     fetcher = DataFetcher(cache_enabled=True)
     asset_inputs = []
+    corrected_symbols = []  # Track which symbols were auto-corrected
     
     for asset in user_portfolio:
         symbol = asset['symbol']
         weight = asset['weight']
+        original_symbol = symbol  # Keep track of original input
         
         try:
-            # Fetch historical data
+            # First, try to fetch with the original symbol
             df = fetcher.fetch_data(symbol)
             
+            # If no data, try auto-correction
             if df is None or df.empty:
-                # Try to suggest correct ticker
                 suggested_ticker = suggest_ticker_correction(symbol)
                 if suggested_ticker:
-                    st.warning(f"❌ No data for **{symbol}**. Did you mean **{suggested_ticker}**?")
+                    # Try the suggested ticker
+                    df = fetcher.fetch_data(suggested_ticker)
+                    if df is not None and not df.empty:
+                        # Success! Use the corrected symbol
+                        symbol = suggested_ticker
+                        corrected_symbols.append((original_symbol, symbol))
+                        st.success(f"✅ Auto-corrected **{original_symbol}** → **{symbol}**")
+                    else:
+                        st.warning(f"❌ No data for **{original_symbol}** or suggested **{suggested_ticker}**")
+                        continue
                 else:
-                    st.warning(f"❌ No data for **{symbol}**. Make sure you're using the ticker symbol (e.g., AAPL), not company name (Apple).")
+                    st.warning(f"❌ No data for **{original_symbol}**. Make sure you're using the ticker symbol (e.g., AAPL), not company name (Apple).")
+                    continue
+            
+            # If we still don't have data, skip
+            if df is None or df.empty:
                 continue
             
             # Compute market state (using existing validated logic - NO CHANGES)
@@ -451,6 +504,19 @@ def compute_portfolio_state_from_user_input(user_portfolio: List[Dict[str, float
     else:
         st.success(f"✅ All {len(asset_inputs)} assets loaded successfully.")
     
+    # Re-normalize weights if some assets failed to load
+    # This ensures weights sum to 1.0 even if we excluded some assets
+    total_weight = sum(asset.weight for asset in asset_inputs)
+    if abs(total_weight - 1.0) > 1e-6:
+        # Re-normalize
+        st.info(f"🔄 Re-normalizing portfolio weights (original total: {total_weight:.2%})")
+        for asset in asset_inputs:
+            asset.weight = asset.weight / total_weight
+        
+        # Verify normalization
+        new_total = sum(asset.weight for asset in asset_inputs)
+        st.success(f"✅ Weights re-normalized to {new_total:.2%}")
+    
     # Create PortfolioInput
     try:
         portfolio_input = PortfolioInput(assets=asset_inputs)
@@ -464,10 +530,10 @@ def compute_portfolio_state_from_user_input(user_portfolio: List[Dict[str, float
         return portfolio_state
         
     except ValueError as e:
-        st.error(f"Portfolio validation error: {str(e)}")
+        st.error(f"❌ Portfolio validation error: {str(e)}")
         return None
     except Exception as e:
-        st.error(f"Error computing portfolio state: {str(e)}")
+        st.error(f"❌ Error computing portfolio state: {str(e)}")
         return None
 
 
