@@ -558,27 +558,9 @@ def render_portfolio_input_simple() -> Optional[List[Dict[str, float]]]:
             {'symbol': 'QQQ', 'weight': 0.4}
         ]
     
-    with st.expander("⚙️ Configure Portfolio", expanded=False):
+    with st.expander("Configure Portfolio", expanded=False):
         st.markdown("#### Portfolio Holdings")
-        st.caption("⚠️ **Important:** Use ticker symbols (e.g., AAPL, MSFT, NVDA), not company names.")
-        
-        # Show common ticker examples
-        with st.expander("💡 Common Ticker Symbols", expanded=False):
-            st.markdown("""
-            **Technology:**  
-            AAPL (Apple), MSFT (Microsoft), NVDA (Nvidia), GOOGL (Google), META (Facebook), TSLA (Tesla)
-            
-            **ETFs:**  
-            SPY (S&P 500), QQQ (Nasdaq 100), IWM (Russell 2000), VTI (Total Market)
-            
-            **Healthcare:**  
-            SYK (Stryker), JNJ (Johnson & Johnson), UNH (UnitedHealth), PFE (Pfizer)
-            
-            **Crypto:**  
-            BTC-USD (Bitcoin), ETH-USD (Ethereum)
-            
-            **Find more tickers:** Use Yahoo Finance search
-            """)
+        st.caption("Enter ticker symbols or company names. Auto-correction is enabled for common names (e.g., Apple → AAPL, Nvidia → NVDA).")
         
         st.markdown("---")
         
@@ -604,11 +586,11 @@ def render_portfolio_input_simple() -> Optional[List[Dict[str, float]]]:
                     default_symbol = st.session_state.user_portfolio[i]['symbol']
                 
                 symbol = st.text_input(
-                    f"Ticker Symbol {i+1}:",
+                    f"Asset {i+1}:",
                     value=default_symbol,
                     key=f"portfolio_symbol_{i}",
-                    placeholder="e.g., AAPL, SPY, NVDA",
-                    help="Enter ticker symbol, not company name. Use Yahoo Finance format (e.g., BTC-USD for Bitcoin)."
+                    placeholder="e.g., AAPL, Apple, Tesla, BTC-USD",
+                    help="Enter ticker symbol or company name. Auto-correction will attempt to match common names to ticker symbols."
                 ).strip().upper()
             
             with col2:
@@ -635,9 +617,9 @@ def render_portfolio_input_simple() -> Optional[List[Dict[str, float]]]:
         
         # Show total weight
         if total_weight != 100.0:
-            st.warning(f"⚠️ Weights sum to {total_weight:.1f}%. Must be 100%.")
+            st.warning(f"Weights sum to {total_weight:.1f}%. Must be 100%.")
         else:
-            st.success(f"✅ Weights sum to {total_weight:.1f}%")
+            st.success(f"Weights sum to {total_weight:.1f}%")
         
         # Update button
         if st.button("Update Portfolio", use_container_width=True):

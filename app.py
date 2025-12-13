@@ -463,6 +463,35 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     st.markdown(brand_header_css + brand_header_html, unsafe_allow_html=True)
     
     # ==========================================================================
+    # TICKER SEARCH (Below brand, above workflow controls)
+    # ==========================================================================
+    
+    col_spacer1, col_search, col_spacer2 = st.columns([1, 2, 1])
+    
+    with col_search:
+        # Clear search field if asset is already selected
+        has_active_asset = 'scan_results' in st.session_state and st.session_state.scan_results
+        if has_active_asset and 'header_search' in st.session_state and st.session_state.header_search:
+            st.session_state.header_search = ""
+        
+        # Dynamic placeholder
+        placeholder_text = "Search another asset (ticker or company name)" if has_active_asset else "Enter ticker symbol or company name (e.g., AAPL, Apple, Tesla)"
+        
+        # Search field with on_change callback
+        search_query = st.text_input(
+            "Search Asset",
+            placeholder=placeholder_text,
+            label_visibility="collapsed",
+            key="header_search",
+            on_change=lambda: handle_header_search(
+                st.session_state.get('header_search', ''),
+                validate_ticker_func,
+                search_ticker_func,
+                run_analysis_func
+            )
+        )
+    
+    # ==========================================================================
     # ZONE 3: WORKFLOW CONTROLS (Navigation + Actions, below divider)
     # ==========================================================================
     
@@ -514,7 +543,12 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
 
 def handle_header_search(query: str, validate_func, search_func, analyze_func):
     """
-    Handle search from header control deck with PLG rate limiting.
+    Handle search from header - accepts ticker symbols OR company names.
+    
+    Flow:
+    1. Try as direct ticker symbol
+    2. If invalid, search by company name
+    3. Show suggestions if multiple matches found
     
     Rate Limits:
     - Public: 2 searches per hour
@@ -528,7 +562,7 @@ def handle_header_search(query: str, validate_func, search_func, analyze_func):
     
     if tier == "public":
         if not check_rate_limit('search', 2):
-            st.error("🔒 **Search Limit Reached** (2 per hour for unauthenticated users)")
+            st.error("Search Limit Reached (2 per hour for unauthenticated users)")
             if st.button("Sign Up for Free - Unlimited Searches", use_container_width=True):
                 st.session_state.show_signup_dialog = True
                 st.rerun()
@@ -541,22 +575,30 @@ def handle_header_search(query: str, validate_func, search_func, analyze_func):
     ticker_input = query.strip().upper()
     
     try:
+        # First, try as direct ticker symbol
         validation = validate_func(ticker_input)
         
         if validation.get('valid'):
+            # Valid ticker - analyze it directly
             results = analyze_func([ticker_input])
             if results and len(results) > 0:
                 st.session_state.current_ticker = ticker_input
                 st.session_state.scan_results = results
                 st.session_state.selected_asset = 0
                 st.session_state.analysis_mode = "deep_dive"
-                st.session_state.header_search = ""
+                st.session_state.view_mode = "asset"  # Switch to asset view
+                st.session_state.header_search = ""  # Clear search field
+                st.rerun()
         else:
+            # Not a valid ticker - try searching by company name
             search_results = search_func(ticker_input)
             if search_results:
+                # Found matches - store for selection
                 st.session_state.ticker_suggestions = search_results
+                st.session_state.header_search = ""  # Clear search field
+                st.rerun()
             else:
-                st.error(f"Could not find '{ticker_input}'. Try entering the exact ticker symbol.")
+                st.error(f"Could not find '{ticker_input}'. Try a different search term.")
     except Exception as e:
         st.error(f"Search error: {str(e)}")
 
