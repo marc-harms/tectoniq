@@ -1663,6 +1663,9 @@ def main():
                 # Replace "DORMANT" with "Low Instability"
                 regime_text = regime_text.replace("DORMANT", "Low Instability").replace("Dormant", "Low Instability")
                 
+                # Remove the word "REGIME" from the end
+                regime_text = regime_text.replace(" REGIME", "").replace(" Regime", "")
+                
                 # Randomly select CTA text (3 options)
                 import random
                 cta_options = [
