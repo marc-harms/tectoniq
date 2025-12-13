@@ -366,6 +366,11 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
             justify-content: space-between;
             align-items: center;
         }
+        .system-context-right {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
         .context-item {
             color: #6B6B6B;
             font-weight: 400;
@@ -407,6 +412,37 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     """
     
     st.markdown(system_bar_html, unsafe_allow_html=True)
+    
+    # Add News link as inline button (minimal styling)
+    st.markdown("""
+    <style>
+        div[data-testid="column"]:has(button[key="inline_news_btn"]) {
+            position: absolute;
+            top: 0.45rem;
+            right: 1.5rem;
+            z-index: 1000;
+        }
+        button[key="inline_news_btn"] {
+            background: none !important;
+            border: none !important;
+            color: #5a6c7d !important;
+            font-size: 0.75rem !important;
+            padding: 0 !important;
+            font-weight: 500 !important;
+            box-shadow: none !important;
+        }
+        button[key="inline_news_btn"]:hover {
+            text-decoration: underline !important;
+            background: none !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Invisible column container for positioning
+    _news_col = st.columns([1])
+    with _news_col[0]:
+        if st.button("News", key="inline_news_btn"):
+            show_news_dialog()
     
     # ==========================================================================
     # ZONE 2: BRAND & PURPOSE (Centered, no buttons, journal-style)
@@ -463,54 +499,34 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     st.markdown(brand_header_css + brand_header_html, unsafe_allow_html=True)
     
     # ==========================================================================
-    # ZONE 3: UTILITY BUTTONS (Simplified - below divider)
+    # ZONE 3: UTILITY BUTTONS (Simplified - only for authenticated users)
     # ==========================================================================
     
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
-    # Center the buttons
-    col_spacer_left, col_buttons, col_spacer_right = st.columns([1, 2, 1])
+    # Only show Portfolio Analysis button for authenticated users
+    from auth_manager import is_authenticated
     
-    with col_buttons:
-        # Determine button layout based on authentication
-        from auth_manager import is_authenticated
+    if is_authenticated():
+        # Center the button
+        col_spacer_left, col_button, col_spacer_right = st.columns([1, 2, 1])
         
-        # Add custom CSS for reduced button size
-        st.markdown("""
-        <style>
-            /* Reduce Tectoniq News button size: 75% width, 50% height */
-            button[key="header_btn_news"] {
-                max-width: 75% !important;
-                padding: 0.25rem 0.625rem !important;
-                margin: 0 auto !important;
-                display: block !important;
-            }
+        with col_button:
+            # Add custom CSS for reduced button size
+            st.markdown("""
+            <style>
+                button[key="header_btn_portfolio"] {
+                    max-width: 75% !important;
+                    padding: 0.25rem 0.625rem !important;
+                    margin: 0 auto !important;
+                    display: block !important;
+                }
+            </style>
+            """, unsafe_allow_html=True)
             
-            button[key="header_btn_portfolio"] {
-                max-width: 75% !important;
-                padding: 0.25rem 0.625rem !important;
-                margin: 0 auto !important;
-                display: block !important;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        if is_authenticated():
-            # Two buttons: Tectoniq News + Portfolio Analysis
-            btn_col1, btn_col2 = st.columns(2)
-            
-            with btn_col1:
-                if st.button("Tectoniq News", key="header_btn_news", use_container_width=False):
-                    show_news_dialog()
-            
-            with btn_col2:
-                if st.button("Portfolio Analysis", key="header_btn_portfolio", use_container_width=False):
-                    st.session_state.view_mode = "portfolio"
-                    st.rerun()
-        else:
-            # Only one button: Tectoniq News (centered)
-            if st.button("Tectoniq News", key="header_btn_news", use_container_width=False):
-                show_news_dialog()
+            if st.button("Portfolio Analysis", key="header_btn_portfolio", use_container_width=False):
+                st.session_state.view_mode = "portfolio"
+                st.rerun()
     
     # ==========================================================================
     # TICKER SEARCH (Below buttons)
@@ -1652,32 +1668,140 @@ def main():
             if results and len(results) > 0:
                 result = results[st.session_state.get('selected_asset', 0)]
                 
-                # Display current asset state
+                # Display current asset state with hero card layout
                 st.markdown("---")
-                st.markdown(f"### Current State: {result['symbol']}")
                 
-                # Show regime and criticality
-                # Note: result['signal'] contains the regime string
+                # Get asset data
+                asset_name = result.get('name', result['symbol'])
+                ticker = result['symbol']
                 regime_text = result.get('signal', 'UNKNOWN')
                 criticality = result.get('criticality_score', 0)
                 
                 # Get color based on criticality
                 if criticality >= 70:
                     regime_color = "#FF6600"  # Red
+                    regime_bg = "rgba(255, 102, 0, 0.1)"
                 elif criticality >= 40:
                     regime_color = "#FFB800"  # Yellow
+                    regime_bg = "rgba(255, 184, 0, 0.1)"
                 else:
                     regime_color = "#00C864"  # Green
+                    regime_bg = "rgba(0, 200, 100, 0.1)"
                 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Asset", result['symbol'])
-                with col2:
-                    st.markdown(f"**Regime:** <span style='color: {regime_color}; font-weight: 700;'>{regime_text}</span>", unsafe_allow_html=True)
-                with col3:
-                    st.metric("Criticality", f"{criticality}/100")
+                # Hero card HTML
+                hero_card_html = f"""
+                <style>
+                    .asset-hero-card {{
+                        max-width: 700px;
+                        margin: 2rem auto;
+                        border: 1px solid #E0E0E0;
+                        border-radius: 4px;
+                        background-color: #FFFFFF;
+                        padding: 2rem;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                    }}
+                    .hero-top-row {{
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        margin-bottom: 2rem;
+                    }}
+                    .hero-left {{
+                        flex: 1;
+                    }}
+                    .hero-asset-name {{
+                        font-family: 'Libre Baskerville', serif;
+                        font-size: 1.75rem;
+                        font-weight: 700;
+                        color: #2B2B2B;
+                        margin: 0 0 0.25rem 0;
+                    }}
+                    .hero-ticker {{
+                        font-family: 'Inter', sans-serif;
+                        font-size: 0.875rem;
+                        color: #6B6B6B;
+                        font-weight: 500;
+                        letter-spacing: 0.05em;
+                    }}
+                    .hero-right {{
+                        text-align: right;
+                    }}
+                    .hero-criticality-label {{
+                        font-family: 'Inter', sans-serif;
+                        font-size: 0.75rem;
+                        color: #6B6B6B;
+                        text-transform: uppercase;
+                        letter-spacing: 0.1em;
+                        margin-bottom: 0.25rem;
+                    }}
+                    .hero-criticality-value {{
+                        font-family: 'Inter', sans-serif;
+                        font-size: 2rem;
+                        font-weight: 700;
+                        color: #2B2B2B;
+                    }}
+                    .hero-criticality-max {{
+                        font-size: 1rem;
+                        color: #6B6B6B;
+                        font-weight: 400;
+                    }}
+                    .hero-regime-bar {{
+                        background-color: {regime_bg};
+                        border-left: 4px solid {regime_color};
+                        padding: 1rem 1.5rem;
+                        text-align: center;
+                        border-radius: 2px;
+                    }}
+                    .hero-regime-label {{
+                        font-family: 'Inter', sans-serif;
+                        font-size: 0.75rem;
+                        color: #6B6B6B;
+                        text-transform: uppercase;
+                        letter-spacing: 0.1em;
+                        margin-bottom: 0.5rem;
+                    }}
+                    .hero-regime-value {{
+                        font-family: 'Libre Baskerville', serif;
+                        font-size: 1.5rem;
+                        font-weight: 700;
+                        color: {regime_color};
+                    }}
+                    .hero-cta {{
+                        text-align: center;
+                        margin-top: 1.5rem;
+                        font-family: 'Inter', sans-serif;
+                        font-size: 0.875rem;
+                        color: #6B6B6B;
+                        font-style: italic;
+                    }}
+                </style>
                 
-                st.caption("Sign up for free to access full analysis and portfolio tracking.")
+                <div class="asset-hero-card">
+                    <div class="hero-top-row">
+                        <div class="hero-left">
+                            <div class="hero-asset-name">{asset_name}</div>
+                            <div class="hero-ticker">{ticker}</div>
+                        </div>
+                        <div class="hero-right">
+                            <div class="hero-criticality-label">Criticality</div>
+                            <div class="hero-criticality-value">
+                                {criticality}<span class="hero-criticality-max"> / 100</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="hero-regime-bar">
+                        <div class="hero-regime-label">Regime Status</div>
+                        <div class="hero-regime-value">{regime_text}</div>
+                    </div>
+                    
+                    <div class="hero-cta">
+                        Sign up for free to access full analysis and portfolio tracking
+                    </div>
+                </div>
+                """
+                
+                st.markdown(hero_card_html, unsafe_allow_html=True)
         
         # Skip to footer for public users
         st.markdown("<div style='height: 3rem;'></div>", unsafe_allow_html=True)
