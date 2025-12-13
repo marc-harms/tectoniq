@@ -334,203 +334,182 @@ def show_upgrade_dialog(feature_name: str, tier: str):
 
 def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     """
-    Render Scientific Masthead header with vitals bar, branding, and control deck.
+    Render journal-style header with three-zone hierarchy.
     
-    Three-tier structure:
-    1. Vitals Bar (dark strip) - Date, Status, User, Logout
-    2. Masthead (branding) - Title, Subtitle, Double Rule
-    3. Control Deck (search & nav) - Search bar + Navigation buttons
+    ZONE 1: System Context Bar (thin, muted, quiet)
+    ZONE 2: Brand & Purpose (centered, no buttons, generous spacing)
+    ZONE 3: Workflow Controls (navigation left, actions right)
+    
+    Phase 3.2: Clean, authoritative, calm information architecture.
     """
     from datetime import datetime
-    from auth_manager import get_current_user_email, logout
     
-    # === VITALS BAR CSS & HTML ===
-    vitals_css = """
+    # ==========================================================================
+    # ZONE 1: SYSTEM CONTEXT BAR (Quietly establish context)
+    # ==========================================================================
+    
+    system_bar_css = """
     <style>
-        .vitals-bar {
-            background-color: #2C3E50;
-            color: #ECF0F1 !important;
-            padding: 10px 0;
-            font-family: 'Roboto', sans-serif;
-            font-size: 0.85rem;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .system-context-bar {
+            background-color: #FAFAFA;
+            border-bottom: 1px solid #E0E0E0;
+            padding: 0.5rem 0;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.75rem;
+            color: #6B6B6B;
         }
-        .vitals-content {
-            max-width: 1400px;
+        .system-context-content {
+            max-width: 900px;
             margin: 0 auto;
-            padding: 0 2rem;
+            padding: 0 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .vitals-left {
-            display: flex;
-            gap: 2rem;
+        .context-item {
+            color: #6B6B6B;
+            font-weight: 400;
         }
-        .vitals-right {
-            display: flex;
-            gap: 1.5rem;
-            align-items: center;
-        }
-        .vitals-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #ECF0F1 !important;
-        }
-        .vitals-item span {
-            color: #ECF0F1 !important;
-        }
-        .vitals-item strong {
-            color: #FFFFFF !important;
-        }
-        .status-online {
-            width: 8px;
-            height: 8px;
-            background-color: #27AE60;
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            background-color: #4a7c59;
             border-radius: 50%;
             display: inline-block;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            margin-right: 0.25rem;
         }
     </style>
     """
     
-    # Get current date and user (PLG version)
-    current_date = datetime.now().strftime("%b %d, %Y")
-    user_name = st.session_state.get('username', 'Public')
+    # Get current date and tier
+    current_date = datetime.now().strftime("%B %d, %Y")
     tier = get_user_tier()
     
-    # Tier display
-    if tier == "premium":
-        tier_label = "Premium"
-        tier_color = "#FFD700"
-    elif tier == "free":
-        tier_label = "Free"
-        tier_color = "#27AE60"
-    else:
-        tier_label = "Public"
-        tier_color = "#95A5A6"
+    # Tier label (neutral, minimal)
+    tier_labels = {"premium": "Premium", "free": "Free", "public": "Public"}
+    tier_label = tier_labels.get(tier, "Public")
     
-    vitals_html = f"""
-    {vitals_css}
-    <div class="vitals-bar">
-        <div class="vitals-content">
-            <div class="vitals-left">
-                <div class="vitals-item">
-                    <span>📅 {current_date}</span>
-        </div>
-                <div class="vitals-item">
-                    <span class="status-online"></span>
-                    <span>System Status: <strong>ONLINE</strong></span>
+    system_bar_html = f"""
+    {system_bar_css}
+    <div class="system-context-bar">
+        <div class="system-context-content">
+            <div class="system-context-left">
+                <span class="context-item">Data as of {current_date}</span>
+            </div>
+            <div class="system-context-right">
+                <span class="context-item">
+                    <span class="status-indicator"></span>ONLINE
+                </span>
+                <span class="context-item">{tier_label}</span>
             </div>
         </div>
-            <div class="vitals-right">
-                <div class="vitals-item">
-                    <span><strong>{user_name}</strong> <span style="color: {tier_color};">({tier_label})</span></span>
     </div>
-    </div>
-    </div>
-        </div>
     """
     
-    st.markdown(vitals_html, unsafe_allow_html=True)
+    st.markdown(system_bar_html, unsafe_allow_html=True)
     
-    # === MASTHEAD (Branding) ===
-    masthead_css = """
+    # ==========================================================================
+    # ZONE 2: BRAND & PURPOSE (Centered, no buttons, journal-style)
+    # ==========================================================================
+    
+    brand_header_css = """
     <style>
-        .masthead-container {
+        .brand-header {
             text-align: center;
-            padding: 2rem 0 1.5rem 0;
-            background-color: #F9F7F1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            padding: 2.5rem 0 2rem 0;
+            background-color: #FFFFFF;
         }
-        .masthead-title {
-            font-family: 'Merriweather', serif;
-            font-size: 3.5rem;
+        .brand-title {
+            font-family: 'Libre Baskerville', 'Georgia', serif;
+            font-size: 2.5rem;
             font-weight: 700;
-            color: #2C3E50;
+            color: #2B2B2B;
             margin: 0 0 0.5rem 0;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
-        .masthead-subtitle {
-            font-family: 'Merriweather', serif;
-            font-size: 1.1rem;
-            font-style: italic;
-            color: #555555;
+        .brand-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            color: #6B6B6B;
             margin: 0 0 1.5rem 0;
+            font-weight: 400;
         }
-        .masthead-divider {
-            width: 600px;
-            max-width: 90%;
+        .brand-divider {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
             border: none;
-            border-top: 3px double #BDC3C7;
-            height: 0;
-            margin: 0;
+            height: 1px;
+            background: linear-gradient(
+                to right,
+                transparent 0%,
+                rgba(0,0,0,0.12) 10%,
+                rgba(0,0,0,0.12) 90%,
+                transparent 100%
+            );
+            opacity: 0.6;
         }
     </style>
     """
     
-    masthead_html = """
-    <div class="masthead-container">
-        <div class="masthead-title">TECTONIQ</div>
-        <div class="masthead-subtitle">Algorithmic Market Forensics</div>
-        <hr class="masthead-divider">
+    brand_header_html = """
+    <div class="brand-header">
+        <div class="brand-title">TECTONIQ</div>
+        <div class="brand-subtitle">Algorithmic Market Forensics</div>
+        <div class="brand-divider"></div>
     </div>
     """
     
-    st.markdown(masthead_css + masthead_html, unsafe_allow_html=True)
+    st.markdown(brand_header_css + brand_header_html, unsafe_allow_html=True)
     
-    # === CONTROL DECK (Navigation) ===
-    # Phase 3: Simplified navigation - Portfolio-first
+    # ==========================================================================
+    # ZONE 3: WORKFLOW CONTROLS (Navigation + Actions, below divider)
+    # ==========================================================================
+    
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
-    # Simple view toggle: Portfolio / Asset
-    col_portfolio, col_asset = st.columns([1, 1])
+    # Layout: Navigation (left 2 cols) + Actions (right 1 col)
+    col_nav, col_actions = st.columns([2, 1])
     
-    with col_portfolio:
-        button_type = "primary" if st.session_state.view_mode == "portfolio" else "secondary"
-        if st.button("📊 Portfolio Risk", key="nav_portfolio", use_container_width=True, type=button_type):
-            st.session_state.view_mode = "portfolio"
-            st.rerun()
-    
-    with col_asset:
-        button_type = "primary" if st.session_state.view_mode == "asset" else "secondary"
-        # Only show asset button if we have a selected asset
-        asset_label = "Asset View"
-        if 'current_ticker' in st.session_state and st.session_state.current_ticker:
-            asset_label = f"{st.session_state.current_ticker}"
+    # LEFT: Primary navigation (tab-like, quiet, no emojis)
+    with col_nav:
+        nav_col1, nav_col2 = st.columns(2)
         
-        if st.button(f"🔍 {asset_label}", key="nav_asset", use_container_width=True, type=button_type):
-            st.session_state.view_mode = "asset"
-            st.rerun()
+        with nav_col1:
+            button_type = "primary" if st.session_state.view_mode == "portfolio" else "secondary"
+            if st.button("Portfolio Risk", key="nav_portfolio", use_container_width=True, type=button_type):
+                st.session_state.view_mode = "portfolio"
+                st.rerun()
+        
+        with nav_col2:
+            button_type = "primary" if st.session_state.view_mode == "asset" else "secondary"
+            # Show asset ticker if selected, otherwise generic label
+            asset_label = "Asset View"
+            if 'current_ticker' in st.session_state and st.session_state.current_ticker:
+                asset_label = st.session_state.current_ticker
+            
+            if st.button(asset_label, key="nav_asset", use_container_width=True, type=button_type):
+                st.session_state.view_mode = "asset"
+                st.rerun()
     
-    st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+    # RIGHT: Secondary actions (utility, smaller visual weight)
+    with col_actions:
+        action_col1, action_col2 = st.columns(2)
+        
+        with action_col1:
+            if st.button("System Updates", key="header_btn_updates", use_container_width=True):
+                show_news_dialog()
+        
+        with action_col2:
+            if st.button("Refresh", key="header_refresh_btn", use_container_width=True):
+                st.cache_data.clear()
+                if 'data' in st.session_state:
+                    del st.session_state['data']
+                if 'scan_results' in st.session_state:
+                    del st.session_state['scan_results']
+                st.rerun()
     
-    # Row 2: News & Updates | Refresh Data (same structure as row 1)
-    col_spacer, col_news, col_refresh = st.columns([3, 1, 1])
-    
-    with col_news:
-        if st.button("🚨 News & Updates", key="header_btn_news", use_container_width=True):
-            show_news_dialog()
-    
-    with col_refresh:
-        if st.button("🔄 Refresh Data", key="header_refresh_btn", use_container_width=True):
-            st.cache_data.clear()
-            if 'data' in st.session_state:
-                del st.session_state['data']
-            if 'scan_results' in st.session_state:
-                del st.session_state['scan_results']
-            st.rerun()
+    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
 
 
 def handle_header_search(query: str, validate_func, search_func, analyze_func):
@@ -1330,9 +1309,9 @@ def show_imprint_dialog():
         st.rerun()
 
 
-@st.dialog("🚨 News & Updates", width="large")
+@st.dialog("System Updates", width="large")
 def show_news_dialog():
-    """Show news & updates in a modal dialog with heritage styling."""
+    """Show system updates in a modal dialog with journal styling."""
     # Read news from file
     try:
         with open("news.txt", "r") as f:
