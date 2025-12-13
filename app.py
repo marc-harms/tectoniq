@@ -413,37 +413,6 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     
     st.markdown(system_bar_html, unsafe_allow_html=True)
     
-    # Add News link as inline button (minimal styling)
-    st.markdown("""
-    <style>
-        div[data-testid="column"]:has(button[key="inline_news_btn"]) {
-            position: absolute;
-            top: 0.45rem;
-            right: 1.5rem;
-            z-index: 1000;
-        }
-        button[key="inline_news_btn"] {
-            background: none !important;
-            border: none !important;
-            color: #5a6c7d !important;
-            font-size: 0.75rem !important;
-            padding: 0 !important;
-            font-weight: 500 !important;
-            box-shadow: none !important;
-        }
-        button[key="inline_news_btn"]:hover {
-            text-decoration: underline !important;
-            background: none !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Invisible column container for positioning
-    _news_col = st.columns([1])
-    with _news_col[0]:
-        if st.button("News", key="inline_news_btn"):
-            show_news_dialog()
-    
     # ==========================================================================
     # ZONE 2: BRAND & PURPOSE (Centered, no buttons, journal-style)
     # ==========================================================================
@@ -512,12 +481,12 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
         col_spacer_left, col_button, col_spacer_right = st.columns([1, 2, 1])
         
         with col_button:
-            # Add custom CSS for reduced button size
+            # Add custom CSS for reduced button size (height reduced by 50%)
             st.markdown("""
             <style>
                 button[key="header_btn_portfolio"] {
                     max-width: 75% !important;
-                    padding: 0.25rem 0.625rem !important;
+                    padding: 0.125rem 0.625rem !important;
                     margin: 0 auto !important;
                     display: block !important;
                 }
@@ -1834,21 +1803,22 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Footer buttons
+        # Footer buttons (reduced height by 50%)
         st.markdown("""
         <style>
             button[key="footer_disclaimer"],
             button[key="footer_data_protection"],
-            button[key="footer_imprint"] {
+            button[key="footer_imprint"],
+            button[key="footer_news"] {
                 max-width: 75% !important;
-                padding: 0.25rem 0.625rem !important;
+                padding: 0.125rem 0.625rem !important;
                 margin: 0 auto !important;
                 display: block !important;
             }
         </style>
         """, unsafe_allow_html=True)
         
-        col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_spacer2 = st.columns([2, 1, 0.3, 1, 0.3, 1, 2])
+        col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_sep3, col4, col_spacer2 = st.columns([1.5, 1, 0.2, 1, 0.2, 1, 0.2, 1, 1.5])
         
         with col1:
             if st.button("Disclaimer", key="footer_disclaimer", use_container_width=False):
@@ -1867,6 +1837,13 @@ def main():
         with col3:
             if st.button("Imprint", key="footer_imprint", use_container_width=False):
                 show_imprint_dialog()
+        
+        with col_sep3:
+            st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
+        
+        with col4:
+            if st.button("News", key="footer_news", use_container_width=False):
+                show_news_dialog()
         
         # Stop rendering here for public users
         return
@@ -2293,21 +2270,22 @@ def main():
     """, unsafe_allow_html=True)
     
     # Legal page buttons (open as modal dialogs)
-    # Add custom CSS for reduced footer button size: 75% width, 50% height
+    # Add custom CSS for reduced footer button size: 75% width, height reduced by 50%
     st.markdown("""
     <style>
         button[key="footer_disclaimer"],
         button[key="footer_data_protection"],
-        button[key="footer_imprint"] {
+        button[key="footer_imprint"],
+        button[key="footer_news_auth"] {
             max-width: 75% !important;
-            padding: 0.25rem 0.625rem !important;
+            padding: 0.125rem 0.625rem !important;
             margin: 0 auto !important;
             display: block !important;
         }
     </style>
     """, unsafe_allow_html=True)
     
-    col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_spacer2 = st.columns([2, 1, 0.3, 1, 0.3, 1, 2])
+    col_spacer1, col1, col_sep1, col2, col_sep2, col3, col_sep3, col4, col_spacer2 = st.columns([1.5, 1, 0.2, 1, 0.2, 1, 0.2, 1, 1.5])
     
     with col1:
         if st.button("Disclaimer", key="footer_disclaimer", use_container_width=False):
@@ -2326,6 +2304,13 @@ def main():
     with col3:
         if st.button("Imprint", key="footer_imprint", use_container_width=False):
             show_imprint_dialog()
+    
+    with col_sep3:
+        st.markdown("<p style='text-align: center; color: #BDC3C7; margin-top: 8px; font-size: 1.2rem;'>|</p>", unsafe_allow_html=True)
+    
+    with col4:
+        if st.button("News", key="footer_news_auth", use_container_width=False):
+            show_news_dialog()
 
 
 if __name__ == "__main__":
