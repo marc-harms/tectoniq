@@ -1827,11 +1827,11 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Footer links (text-based, styled as buttons to trigger dialogs)
+        # Footer links (using buttons styled to look like plain text)
         st.markdown("""
         <style>
-            /* Style buttons to look like text links */
-            button[key^="footer_link_"] {
+            /* Make buttons look like plain text links */
+            button[key^="footer_text_link_"] {
                 background: none !important;
                 border: none !important;
                 color: #5a6c7d !important;
@@ -1839,44 +1839,50 @@ def main():
                 font-family: 'Inter', sans-serif !important;
                 font-size: 0.875rem !important;
                 font-weight: 500 !important;
-                padding: 0 0.5rem !important;
-                cursor: pointer !important;
+                padding: 0 !important;
+                margin: 0 !important;
                 box-shadow: none !important;
+                cursor: pointer !important;
+                height: auto !important;
+                min-height: 0 !important;
+                line-height: 1.5 !important;
             }
-            button[key^="footer_link_"]:hover {
+            button[key^="footer_text_link_"]:hover {
                 text-decoration: underline !important;
                 background: none !important;
             }
-            .footer-separator {
-                color: #BDC3C7;
-                padding: 0 0.25rem;
-                font-size: 0.875rem;
+            /* Hide button containers */
+            div[data-testid="column"]:has(button[key^="footer_text_link_"]) {
+                padding: 0 !important;
+                margin: 0 !important;
             }
         </style>
         """, unsafe_allow_html=True)
         
-        # Footer links as styled buttons (centered)
-        col_spacer1, col_center, col_spacer2 = st.columns([1, 2, 1])
-        with col_center:
-            cols = st.columns([1, 0.1, 1, 0.1, 1, 0.1, 1])
-            with cols[0]:
-                if st.button("Disclaimer", key="footer_link_disclaimer"):
-                    show_disclaimer_dialog()
-            with cols[1]:
-                st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
-            with cols[2]:
-                if st.button("Data Protection", key="footer_link_data"):
-                    show_data_protection_dialog()
-            with cols[3]:
-                st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
-            with cols[4]:
-                if st.button("Imprint", key="footer_link_imprint"):
-                    show_imprint_dialog()
-            with cols[5]:
-                st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
-            with cols[6]:
-                if st.button("News", key="footer_link_news"):
-                    show_news_dialog()
+        # Create inline text-link buttons (centered)
+        st.markdown("<div style='text-align: center; padding: 0.5rem 0;'>", unsafe_allow_html=True)
+        
+        cols = st.columns([1, 0.05, 1, 0.05, 1, 0.05, 1])
+        with cols[0]:
+            if st.button("Disclaimer", key="footer_text_link_disclaimer"):
+                show_disclaimer_dialog()
+        with cols[1]:
+            st.markdown("<span style='color: #BDC3C7;'>|</span>", unsafe_allow_html=True)
+        with cols[2]:
+            if st.button("Data Protection", key="footer_text_link_data"):
+                show_data_protection_dialog()
+        with cols[3]:
+            st.markdown("<span style='color: #BDC3C7;'>|</span>", unsafe_allow_html=True)
+        with cols[4]:
+            if st.button("Imprint", key="footer_text_link_imprint"):
+                show_imprint_dialog()
+        with cols[5]:
+            st.markdown("<span style='color: #BDC3C7;'>|</span>", unsafe_allow_html=True)
+        with cols[6]:
+            if st.button("News", key="footer_text_link_news"):
+                show_news_dialog()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Stop rendering here for public users
         return
@@ -2302,11 +2308,11 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Legal page links (text-based, styled as buttons to trigger dialogs)
+    # Legal page links (using buttons styled to look like plain text)
     st.markdown("""
     <style>
-        /* Style buttons to look like text links */
-        button[key^="footer_link_auth_"] {
+        /* Make buttons look like plain text links */
+        button[key^="footer_text_link_auth_"] {
             background: none !important;
             border: none !important;
             color: #5a6c7d !important;
@@ -2314,44 +2320,50 @@ def main():
             font-family: 'Inter', sans-serif !important;
             font-size: 0.875rem !important;
             font-weight: 500 !important;
-            padding: 0 0.5rem !important;
-            cursor: pointer !important;
+            padding: 0 !important;
+            margin: 0 !important;
             box-shadow: none !important;
+            cursor: pointer !important;
+            height: auto !important;
+            min-height: 0 !important;
+            line-height: 1.5 !important;
         }
-        button[key^="footer_link_auth_"]:hover {
+        button[key^="footer_text_link_auth_"]:hover {
             text-decoration: underline !important;
             background: none !important;
         }
-        .footer-separator {
-            color: #BDC3C7;
-            padding: 0 0.25rem;
-            font-size: 0.875rem;
+        /* Hide button containers */
+        div[data-testid="column"]:has(button[key^="footer_text_link_auth_"]) {
+            padding: 0 !important;
+            margin: 0 !important;
         }
     </style>
     """, unsafe_allow_html=True)
     
-    # Footer links as styled buttons (centered)
-    col_spacer1, col_center, col_spacer2 = st.columns([1, 2, 1])
-    with col_center:
-        cols = st.columns([1, 0.1, 1, 0.1, 1, 0.1, 1])
-        with cols[0]:
-            if st.button("Disclaimer", key="footer_link_auth_disclaimer"):
-                show_disclaimer_dialog()
-        with cols[1]:
-            st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
-        with cols[2]:
-            if st.button("Data Protection", key="footer_link_auth_data"):
-                show_data_protection_dialog()
-        with cols[3]:
-            st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
-        with cols[4]:
-            if st.button("Imprint", key="footer_link_auth_imprint"):
-                show_imprint_dialog()
-        with cols[5]:
-            st.markdown("<span class='footer-separator'>|</span>", unsafe_allow_html=True)
-        with cols[6]:
-            if st.button("News", key="footer_link_auth_news"):
-                show_news_dialog()
+    # Create inline text-link buttons (centered)
+    st.markdown("<div style='text-align: center; padding: 0.5rem 0;'>", unsafe_allow_html=True)
+    
+    cols = st.columns([1, 0.05, 1, 0.05, 1, 0.05, 1])
+    with cols[0]:
+        if st.button("Disclaimer", key="footer_text_link_auth_disclaimer"):
+            show_disclaimer_dialog()
+    with cols[1]:
+        st.markdown("<span style='color: #BDC3C7;'>|</span>", unsafe_allow_html=True)
+    with cols[2]:
+        if st.button("Data Protection", key="footer_text_link_auth_data"):
+            show_data_protection_dialog()
+    with cols[3]:
+        st.markdown("<span style='color: #BDC3C7;'>|</span>", unsafe_allow_html=True)
+    with cols[4]:
+        if st.button("Imprint", key="footer_text_link_auth_imprint"):
+            show_imprint_dialog()
+    with cols[5]:
+        st.markdown("<span style='color: #BDC3C7;'>|</span>", unsafe_allow_html=True)
+    with cols[6]:
+        if st.button("News", key="footer_text_link_auth_news"):
+            show_news_dialog()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
