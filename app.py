@@ -1640,6 +1640,15 @@ def main():
                 # Display current asset state with hero card layout
                 st.markdown("---")
                 
+                # Add explanatory text above hero card
+                st.markdown("""
+                <div style="text-align: center; margin: 1.5rem auto 0.5rem auto; max-width: 700px;">
+                    <p style="font-family: 'Inter', sans-serif; font-size: 0.875rem; color: #6B6B6B; font-style: italic;">
+                        TECTONIQ classifies market states based on structural instability, not price direction.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 # Get asset data
                 asset_name = result.get('name', result['symbol'])
                 ticker = result['symbol']
@@ -1650,6 +1659,9 @@ def main():
                 # The signal field often contains emoji like "⚪ DORMANT REGIME"
                 import re
                 regime_text = re.sub(r'[^\w\s-]', '', regime_text).strip()  # Remove non-alphanumeric except spaces and hyphens
+                
+                # Replace "DORMANT" with "Low Instability"
+                regime_text = regime_text.replace("DORMANT", "Low Instability").replace("Dormant", "Low Instability")
                 
                 # Randomly select CTA text (3 options)
                 import random
