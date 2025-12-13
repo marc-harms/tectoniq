@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/marc/Projects/tectoniq/tectoniq/validate_regime_behavior.py", line 13, in <module>
+    import matplotlib.pyplot as plt
+ModuleNotFoundError: No module named 'matplotlib'

@@ -33,6 +33,368 @@ import requests
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from dataclasses import dataclass
+from typing import Literal
+
+# =============================================================================
+# SINGLE SOURCE OF TRUTH: MARKET STATE
+# =============================================================================
+
+@dataclass
+class MarketState:
+    """
+    Single source of truth for market state at a specific point in time.
+    
+    All regime classifications, hero card displays, plot colors, and simulations
+    must use this dataclass to ensure consistency.
+    
+    Attributes:
+        date: Timestamp of the observation
+        volatility: Rolling volatility value (30-day std of returns)
+        volatility_percentile: Trailing percentile rank (0-100)
+        trend_state: Price trend relative to SMA200 with hysteresis
+        criticality: Risk score (0-100) based on volatility + trend + extension
+        regime: Simplified 3-tier classification (GREEN/YELLOW/RED)
+        reason_codes: List of short explainable codes (max 4)
+    """
+    date: pd.Timestamp
+    volatility: float
+    volatility_percentile: float
+    trend_state: Literal["UP", "DOWN", "NEUTRAL"]
+    criticality: int  # 0-100
+    regime: Literal["GREEN", "YELLOW", "RED"]
+    reason_codes: list[str]  # max 4 codes
+    # Explainability (Phase 0.2): weighted component contributions to criticality
+    # Optional to preserve backward compatibility and allow non-explainable states.
+    volatility_component: Optional[int] = None
+    trend_component: Optional[int] = None
+    extension_component: Optional[int] = None
+
+
+def compute_market_state(df: pd.DataFrame, idx: int, 
+                         sma_window: int = 200,
+                         vol_window: int = 30,
+                         percentile_lookback: int = 504,
+                         hysteresis: float = 0.02) -> MarketState:
+    """
+    Compute market state for a single point in time using only trailing data.
+    
+    This is the SINGLE SOURCE OF TRUTH for all regime classifications.
+    No look-ahead bias - only uses data up to and including idx.
+    
+    Args:
+        df: DataFrame with OHLCV data (must have 'close' column)
+        idx: Integer index position (NOT timestamp) to evaluate
+        sma_window: Window for SMA trend calculation (default: 200)
+        vol_window: Window for volatility calculation (default: 30)
+        percentile_lookback: Window for volatility percentile rank (default: 504 ~2yr)
+        hysteresis: Dead zone around SMA for trend determination (default: 2%)
+    
+    Returns:
+        MarketState object with all computed metrics
+    
+    Regime Mapping (STRICT):
+        GREEN: criticality < 40  (Low risk, healthy)
+        YELLOW: 40 ≤ criticality < 70  (Medium risk, caution)
+        RED: criticality ≥ 70  (High risk, danger)
+    
+    Criticality Calculation (WEIGHTED, CONTINUOUS):
+        criticality = 0.70 * vol_percentile + 
+                      0.20 * trend_risk + 
+                      0.10 * extension_risk
+        
+        - vol_percentile: Trailing volatility rank (excludes current)
+        - trend_risk: Continuous (0-100), based on magnitude below SMA
+        - extension_risk: Continuous (0-100), based on extremity above SMA
+        - All components are bounded [0,100] and monotonic
+        - Final score clamped to [0,100]
+    
+    Example:
+        >>> df = yf.download("AAPL", period="2y")
+        >>> state = compute_market_state(df, len(df)-1)
+        >>> print(f"{state.regime}: {state.criticality}")
+    """
+    # Validate inputs
+    if df is None or df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if idx < 0 or idx >= len(df):
+        raise ValueError(f"Index {idx} out of bounds (df length: {len(df)})")
+    
+    if 'close' not in df.columns:
+        raise ValueError("DataFrame must contain 'close' column")
+    
+    # Use only data up to idx (NO LOOK-AHEAD)
+    historical_df = df.iloc[:idx+1].copy()
+    
+    # Calculate SMA (requires full window)
+    if len(historical_df) < sma_window:
+        raise ValueError(f"Insufficient data: need {sma_window} rows, got {len(historical_df)}")
+    
+    historical_df['sma'] = historical_df['close'].rolling(window=sma_window).mean()
+    
+    # Calculate returns and volatility
+    historical_df['returns'] = historical_df['close'].pct_change()
+    historical_df['volatility'] = historical_df['returns'].rolling(window=vol_window).std()
+    
+    # Get current values (at idx)
+    current = historical_df.iloc[-1]
+    current_price = current['close']
+    current_sma = current['sma']
+    current_vol = current['volatility']
+    current_date = current.name if isinstance(current.name, pd.Timestamp) else pd.Timestamp(current.name)
+    
+    # Check for NaN (insufficient data for calculations)
+    if pd.isna(current_sma) or pd.isna(current_vol):
+        raise ValueError(f"Insufficient data at index {idx} for SMA/volatility calculation")
+    
+    # === VOLATILITY PERCENTILE (Trailing Window Only) ===
+    # FIX 1: Exclude current observation from reference distribution
+    lookback_window = min(percentile_lookback, len(historical_df))
+    trailing_window = historical_df.iloc[-lookback_window:]
+    vol_series = trailing_window['volatility'].dropna()
+    
+    if len(vol_series) < 30:
+        # Not enough data for reliable percentile
+        vol_percentile = 50.0  # Default to median
+    else:
+        # Exclude current observation: use only historical (strict trailing)
+        historical_vols = vol_series.iloc[:-1] if len(vol_series) > 1 else vol_series
+        if len(historical_vols) == 0:
+            vol_percentile = 50.0
+        else:
+            # Percentile: what % of *past* values are <= current?
+            vol_percentile = float((current_vol <= historical_vols).sum() / len(historical_vols) * 100)
+    
+    # === TREND STATE (with hysteresis) ===
+    upper_bound = current_sma * (1.0 + hysteresis)
+    lower_bound = current_sma * (1.0 - hysteresis)
+    
+    if current_price > upper_bound:
+        trend_state = "UP"
+    elif current_price < lower_bound:
+        trend_state = "DOWN"
+    else:
+        trend_state = "NEUTRAL"
+    
+    # === PRICE DEVIATION METRICS (for continuous modifiers) ===
+    # Calculate price deviation from SMA as percentage
+    price_deviation_pct = ((current_price - current_sma) / current_sma * 100) if current_sma > 0 else 0
+    
+    # FIX 3: Asset-agnostic extension risk via percentile
+    # Get historical deviations for percentile calculation
+    historical_df['price_deviation'] = ((historical_df['close'] - historical_df['sma']) / historical_df['sma'] * 100)
+    dev_series = historical_df['price_deviation'].iloc[-lookback_window:].dropna()
+    
+    if len(dev_series) > 30:
+        # Exclude current from historical distribution
+        historical_devs = dev_series.iloc[:-1] if len(dev_series) > 1 else dev_series
+        if len(historical_devs) > 0:
+            # Extension percentile: how extreme is current deviation?
+            extension_percentile = float((abs(price_deviation_pct) <= abs(historical_devs)).sum() / len(historical_devs) * 100)
+        else:
+            extension_percentile = 50.0
+    else:
+        extension_percentile = 50.0
+    
+    # === CRITICALITY SCORE (Weighted Combination) ===
+    # FIX 2, 4, 5: Continuous modifiers with weighted combination
+    
+    # Component 1: Volatility (dominant, weight ≥ 0.6)
+    vol_component = vol_percentile
+    
+    # Component 2: Trend Risk (continuous, bounded)
+    # FIX 4: Gradual trend risk based on magnitude below SMA
+    if price_deviation_pct < 0:
+        # Below SMA: risk increases with distance (normalized to 0-100)
+        # Use magnitude of deviation and its percentile for smooth scaling
+        trend_risk = min(100, abs(price_deviation_pct) * 2.0)  # Scale: -10% → 20 risk
+        # Boost by percentile to make it relative to history
+        if len(dev_series) > 30:
+            below_sma_devs = dev_series[dev_series < 0]
+            if len(below_sma_devs) > 0:
+                trend_risk_percentile = float((price_deviation_pct <= below_sma_devs).sum() / len(below_sma_devs) * 100)
+                trend_risk = trend_risk * (trend_risk_percentile / 100.0)  # Modulate by historical severity
+        trend_risk = min(100, trend_risk)
+    else:
+        # Above or at SMA: minimal trend risk
+        trend_risk = 0.0
+    
+    # Component 3: Extension Risk (continuous, bounded)
+    # FIX 3: Use percentile for asset-agnostic extension
+    # High positive deviation (parabolic) increases risk
+    if price_deviation_pct > 0:
+        # Extension risk grows with extremity of positive deviation
+        extension_risk = max(0, (extension_percentile - 50) * 2.0)  # Scale: 50th %ile → 0, 100th → 100
+    else:
+        # Negative deviation doesn't contribute to extension risk
+        extension_risk = 0.0
+    
+    # FIX 5: Weighted combination (w_vol ≥ 0.6, others ≤ 0.4)
+    w_vol = 0.70
+    w_trend = 0.20
+    w_ext = 0.10
+    
+    criticality = (w_vol * vol_component + 
+                   w_trend * trend_risk + 
+                   w_ext * extension_risk)
+    
+    # Clamp to 0-100
+    criticality = max(0, min(100, criticality))
+    criticality_int = int(round(criticality))
+
+    # === EXPLAINABILITY (Phase 0.2): component decomposition ===
+    # IMPORTANT: This must NOT change criticality_int. We only decompose the already
+    # computed weighted sum into integer contributions that add up to criticality_int.
+    volatility_component_f = w_vol * vol_component
+    trend_component_f = w_trend * trend_risk
+    extension_component_f = w_ext * extension_risk
+
+    # Use deterministic remainder allocation so components sum to criticality_int.
+    floors = [
+        int(np.floor(volatility_component_f)),
+        int(np.floor(trend_component_f)),
+        int(np.floor(extension_component_f)),
+    ]
+    remainders = [
+        volatility_component_f - floors[0],
+        trend_component_f - floors[1],
+        extension_component_f - floors[2],
+    ]
+    remainder_to_allocate = criticality_int - sum(floors)
+    if remainder_to_allocate > 0:
+        # Allocate +1 to the largest remainders (ties broken by fixed order).
+        order = sorted(range(3), key=lambda i: remainders[i], reverse=True)
+        for i in order[:min(remainder_to_allocate, 3)]:
+            floors[i] += 1
+    # Safety: ensure sum matches, without altering criticality_int.
+    if sum(floors) != criticality_int:
+        # Deterministic correction: adjust volatility component to match.
+        floors[0] += (criticality_int - sum(floors))
+
+    volatility_component = int(floors[0])
+    trend_component = int(floors[1])
+    extension_component = int(floors[2])
+    
+    # === REGIME MAPPING (3-tier, strict thresholds) ===
+    if criticality_int < 40:
+        regime = "GREEN"
+    elif criticality_int < 70:
+        regime = "YELLOW"
+    else:
+        regime = "RED"
+    
+    # === REASON CODES (max 4, mechanistic only) ===
+    # FIX 6: Keep only mechanistic codes (no severity labels)
+    reason_codes = []
+    
+    # Mechanism 1: Volatility level (mechanistic)
+    if vol_percentile >= 90:
+        reason_codes.append("VOL_EXTREME")
+    elif vol_percentile >= 70:
+        reason_codes.append("VOL_HIGH")
+    elif vol_percentile <= 20:
+        reason_codes.append("VOL_LOW")
+    else:
+        reason_codes.append("VOL_NORMAL")
+    
+    # Mechanism 2: Trend direction (mechanistic)
+    if trend_state == "DOWN":
+        reason_codes.append("TREND_DOWN")
+    elif trend_state == "UP":
+        reason_codes.append("TREND_UP")
+    else:
+        reason_codes.append("TREND_FLAT")
+    
+    # Mechanism 3: Extension status (mechanistic, using percentile)
+    if extension_percentile >= 95:
+        reason_codes.append("EXTENSION_EXTREME")
+    elif extension_percentile >= 80:
+        reason_codes.append("EXTENSION_HIGH")
+    
+    # Limit to 4 codes (mechanistic only, no "CRITICAL" severity)
+    reason_codes = reason_codes[:4]
+    
+    return MarketState(
+        date=current_date,
+        volatility=float(current_vol),
+        volatility_percentile=float(vol_percentile),
+        trend_state=trend_state,
+        criticality=criticality_int,
+        regime=regime,
+        reason_codes=reason_codes,
+        volatility_component=volatility_component,
+        trend_component=trend_component,
+        extension_component=extension_component
+    )
+
+
+def get_regime_color(regime: Literal["GREEN", "YELLOW", "RED"]) -> str:
+    """
+    Get hex color code for regime display.
+    
+    Args:
+        regime: GREEN, YELLOW, or RED
+    
+    Returns:
+        Hex color code
+    """
+    if regime == "GREEN":
+        return "#27AE60"  # Green
+    elif regime == "YELLOW":
+        return "#F39C12"  # Orange/Yellow
+    elif regime == "RED":
+        return "#C0392B"  # Red
+    else:
+        return "#95A5A6"  # Grey (fallback)
+
+
+def market_state_to_legacy_dict(state: MarketState, symbol: str = "", price: float = 0.0) -> Dict[str, Any]:
+    """
+    Convert MarketState to legacy dictionary format for backward compatibility.
+    
+    This allows old code to continue working with minimal changes.
+    
+    Args:
+        state: MarketState object
+        symbol: Asset symbol (for legacy compatibility)
+        price: Current price (for legacy compatibility)
+    
+    Returns:
+        Dictionary matching old get_market_phase() format
+    """
+    # Map 3-tier regime to legacy 5-tier signal
+    if state.regime == "GREEN":
+        if state.trend_state == "UP":
+            signal = "🟢 STABLE REGIME"
+            tier = "STABLE"
+        else:
+            signal = "⚪ DORMANT REGIME"
+            tier = "DORMANT"
+    elif state.regime == "YELLOW":
+        signal = "🟡 ACTIVE REGIME"
+        tier = "ACTIVE"
+    else:  # RED
+        if state.criticality >= 80:
+            signal = "🔴 CRITICAL REGIME"
+            tier = "CRITICAL"
+        else:
+            signal = "🟠 HIGH ENERGY REGIME"
+            tier = "HIGH_ENERGY"
+    
+    return {
+        "symbol": symbol,
+        "price": price,
+        "volatility": state.volatility,
+        "vol_percentile": state.volatility_percentile,
+        "criticality_score": state.criticality,
+        "signal": signal,
+        "tier": tier,
+        "trend": state.trend_state,
+        "regime": state.regime,
+        "reason_codes": state.reason_codes
+    }
+
 
 # --- CONFIGURATION & CONSTANTS ---
 
@@ -381,145 +743,62 @@ class SOCAnalyzer:
 
     def get_market_phase(self) -> Dict[str, Any]:
         """
-        5-Tier Traffic Light System:
-        ⚪ GREY (Dormant): Trend DOWN + Low Stress = Dead money / Trap
-        🟢 GREEN (Accumulation): Trend UP + Low/Normal Stress = Safe entry
-        🟡 YELLOW (Active): Trend UP + Medium Stress = Trend maturing, hold
-        🟠 ORANGE (Overheated): Trend UP + High Stress (>80th %ile) = FOMO phase, tighten stops
-        🔴 RED (Critical): Trend DOWN + High Stress OR Extreme Vol (>99th %ile) = Crash/Liquidation risk
+        REFACTORED: Uses single source of truth compute_market_state().
+        
+        Returns legacy format dictionary for backward compatibility.
         """
         if self.metrics_df.empty:
             return {"signal": "NO_DATA", "color": "grey", "criticality_score": 0}
 
-        # Current values
-        current_price = self.summary_stats["current_price"]
-        sma_200 = self.summary_stats["current_sma_200"]
-        current_vol = self.metrics_df["volatility"].iloc[-1]
-        vol_percentile = self.summary_stats.get("current_vol_percentile", 50)
-        
-        # Calculate 24h (1-day) price change percentage
-        price_change_1d = 0.0
-        if len(self.metrics_df) >= 2:
-            prev_price = self.metrics_df["close"].iloc[-2]
-            if prev_price > 0:
-                price_change_1d = ((current_price - prev_price) / prev_price) * 100
-        
-        # Thresholds (5-tier)
-        vol_low = self.calculator.vol_low_threshold
-        vol_medium = self.calculator.vol_medium_threshold
-        vol_high = self.calculator.vol_high_threshold
-        vol_extreme = self.calculator.vol_extreme_threshold
-        
-        # Trend calculation with hysteresis
-        upper_bound = sma_200 * (1.0 + self.hysteresis)
-        lower_bound = sma_200 * (1.0 - self.hysteresis)
-        
-        is_uptrend = current_price > upper_bound
-        is_downtrend = current_price < lower_bound
-        
-        # Distance from SMA (for parabolic detection)
-        sma_distance_pct = ((current_price - sma_200) / sma_200) * 100 if sma_200 > 0 else 0
-        is_parabolic = sma_distance_pct > 30  # >30% above SMA = parabolic
-        
-        # Stress levels (5-tier)
-        is_low_stress = current_vol <= vol_low
-        is_normal_stress = vol_low < current_vol <= vol_medium
-        is_medium_stress = vol_medium < current_vol <= vol_high
-        is_high_stress = vol_high < current_vol <= vol_extreme
-        is_extreme_stress = current_vol > vol_extreme
-        
-        # --- Calculate Criticality Score (0-100) ---
-        # Base: Volatility percentile (0-100)
-        criticality_score = vol_percentile
-        
-        # Modifier: Downtrend adds +10 (risk is higher)
-        if is_downtrend:
-            criticality_score += 10
-        
-        # Modifier: Parabolic adds +10 (overextension risk)
-        if is_parabolic:
-            criticality_score += 10
-        
-        # Clamp to 0-100
-        criticality_score = max(0, min(100, criticality_score))
-        
-        # --- Determine Regime (5-Tier Energy State System) ---
-        # Compliance-safe: Describes market state, NOT investment advice
-        signal = "⚪ DORMANT REGIME"
-        tier = "DORMANT"
-        trend_label = "NEUTRAL"
-        stress_label = "LOW"
-        
-        # Extreme volatility always triggers CRITICAL (regardless of trend)
-        if is_extreme_stress:
-            signal = "🔴 CRITICAL REGIME"
-            tier = "CRITICAL"
-            trend_label = "VOLATILE"
-            stress_label = "EXTREME"
-        
-        # Uptrend scenarios
-        elif is_uptrend:
-            trend_label = "UP"
-            if is_low_stress or is_normal_stress:
-                signal = "🟢 STABLE REGIME"
-                tier = "STABLE"
-                stress_label = "LOW"
-            elif is_medium_stress:
-                signal = "🟡 ACTIVE REGIME"
-                tier = "ACTIVE"
-                stress_label = "MEDIUM"
-            elif is_high_stress:
-                signal = "🟠 HIGH ENERGY REGIME"
-                tier = "HIGH_ENERGY"
-                stress_label = "HIGH"
-        
-        # Downtrend scenarios
-        elif is_downtrend:
-            trend_label = "DOWN"
-            if is_high_stress:
-                signal = "🔴 CRITICAL REGIME"
-                tier = "CRITICAL"
-                stress_label = "HIGH"
-            else:
-                # Low/Normal/Medium stress in downtrend = Dormant
-                signal = "⚪ DORMANT REGIME"
-                tier = "DORMANT"
-                stress_label = "LOW" if is_low_stress else ("NORMAL" if is_normal_stress else "MEDIUM")
-        
-        # Neutral (between bounds)
-        else:
-            trend_label = "NEUTRAL"
-            if is_high_stress:
-                signal = "🟡 ACTIVE REGIME"
-                tier = "ACTIVE"
-                stress_label = "HIGH"
-            elif is_medium_stress:
-                signal = "🟡 ACTIVE REGIME"
-                tier = "ACTIVE"
-                stress_label = "MEDIUM"
-            else:
-                signal = "🟢 STABLE REGIME"
-                tier = "STABLE"
-                stress_label = "LOW" if is_low_stress else "NORMAL"
-
-        return {
-            "symbol": self.symbol,
-            "price": current_price,
-            "price_change_1d": price_change_1d,  # 24h price change percentage
-            "sma_200": sma_200,
-            "dist_to_sma": sma_distance_pct / 100,  # As decimal
-            "dist_to_sma_pct": sma_distance_pct,
-            "volatility": current_vol,
-            "vol_percentile": vol_percentile,
-            "vol_threshold_high": vol_high,
-            "criticality_score": round(criticality_score),
-            "stress_score": current_vol / vol_high if vol_high > 0 else 0,
-            "signal": signal,
-            "tier": tier,
-            "trend": trend_label,
-            "stress": stress_label,
-            "is_parabolic": is_parabolic
-        }
+        try:
+            # Use new single source of truth
+            state = compute_market_state(
+                df=self.df,
+                idx=len(self.df) - 1,  # Last row (current)
+                sma_window=self.calculator.sma_window,
+                vol_window=self.calculator.vol_window,
+                hysteresis=self.hysteresis
+            )
+            
+            # Get current price and SMA for additional fields
+            current_price = self.summary_stats["current_price"]
+            sma_200 = self.summary_stats["current_sma_200"]
+            
+            # Calculate 24h price change
+            price_change_1d = 0.0
+            if len(self.metrics_df) >= 2:
+                prev_price = self.metrics_df["close"].iloc[-2]
+                if prev_price > 0:
+                    price_change_1d = ((current_price - prev_price) / prev_price) * 100
+            
+            # Distance from SMA
+            sma_distance_pct = ((current_price - sma_200) / sma_200) * 100 if sma_200 > 0 else 0
+            is_parabolic = sma_distance_pct > 30
+            
+            # Convert to legacy format
+            legacy_dict = market_state_to_legacy_dict(state, self.symbol, current_price)
+            
+            # Add extra fields for backward compatibility
+            legacy_dict.update({
+                "price_change_1d": price_change_1d,
+                "sma_200": sma_200,
+                "dist_to_sma": sma_distance_pct / 100,
+                "dist_to_sma_pct": sma_distance_pct,
+                "is_parabolic": is_parabolic,
+                "stress": "HIGH" if state.criticality >= 70 else ("MEDIUM" if state.criticality >= 40 else "LOW")
+            })
+            
+            return legacy_dict
+            
+        except Exception as e:
+            # Fallback on error
+            print(f"Error in get_market_phase: {e}")
+            return {
+                "signal": "ERROR",
+                "color": "grey",
+                "criticality_score": 0,
+                "error": str(e)
+            }
 
     def get_plotly_figures(self, dark_mode: bool = True) -> Dict[str, go.Figure]:
         """
@@ -2028,100 +2307,73 @@ def calculate_audit_metrics(daily_data: pd.DataFrame, strategy_mode: str = "defe
 
 
 # =============================================================================
-# CENTRALIZED REGIME CLASSIFIER (Single Source of Truth)
+# DEPRECATED: Legacy regime classifier (Use compute_market_state instead)
 # =============================================================================
 
 def determine_market_regime(criticality: float, trend: str, volatility_percentile: float) -> dict:
     """
-    SINGLE SOURCE OF TRUTH for market regime classification.
+    DEPRECATED: Use compute_market_state() for new code.
     
-    This function is used by:
-    - Hero Card display (app.py)
-    - Plot bar colors (logic.py)
-    - Any other UI component
-    
-    STRICT HIERARCHY (Top-Down Priority):
-    1. Trend DOWN → STRUCTURAL DECLINE (Grey)
-    2. Criticality ≥ 80 → CRITICAL INSTABILITY (Red)
-    3. Criticality ≥ 65 OR Volatility > 85% → HIGH ENERGY MANIA (Orange)
-    4. Volatility < 20% → DORMANT STASIS (Green)
-    5. Default → ORGANIC GROWTH (Blue)
+    Legacy wrapper for backward compatibility.
+    Maps criticality/trend to regime name and color.
     
     Args:
-        criticality: Criticality score (0-100), includes trend modifiers
-        trend: 'UP', 'DOWN', 'BULL', 'BEAR', 'FLAT', or 'NEUTRAL'
+        criticality: Criticality score (0-100)
+        trend: 'UP', 'DOWN', 'NEUTRAL', 'BULL', 'BEAR', 'FLAT'
         volatility_percentile: Volatility rank (0-100)
     
     Returns:
-        Dict with:
-            - name: Regime name (e.g., "CRITICAL INSTABILITY")
-            - color: Hex color code (e.g., "#C0392B")
-            - image_key: Image identifier (e.g., "critical_regime")
-            - icon: Emoji icon (e.g., "🔴")
-    
-    Example:
-        >>> regime = determine_market_regime(75, "UP", 50)
-        >>> print(regime['name'])  # "HIGH ENERGY MANIA"
-        >>> print(regime['color'])  # "#D35400"
+        Dict with name, color, image_key, icon, description
     """
     crit = float(criticality)
-    vola_p = float(volatility_percentile)
     trend_upper = str(trend).upper()
     
-    # Normalize trend to UP/DOWN
+    # Normalize trend
     is_downtrend = trend_upper in ['DOWN', 'BEAR']
-    is_uptrend = trend_upper in ['UP', 'BULL']
     
-    # === STRICT HIERARCHY (Top-Down) ===
+    # Map to simplified 3-tier regime
+    if crit >= 70:
+        regime = "RED"
+    elif crit >= 40:
+        regime = "YELLOW"
+    else:
+        regime = "GREEN"
     
-    # 1. STRUCTURAL DECLINE (Crash/Bear Market) - HIGHEST PRIORITY
+    # Special case: downtrend overrides
     if is_downtrend:
         return {
             'name': 'STRUCTURAL DECLINE',
-            'color': '#7F8C8D',  # Slate Grey
-            'image_key': 'crash_regime',
+            'color': '#7F8C8D',  # Grey
+            'image_key': 'dormant_regime',
             'icon': '⚫',
-            'description': 'Primary Trend is DOWN. Avoid. Cash Position Recommended.'
+            'description': 'Downtrend detected'
         }
     
-    # 2. CRITICAL INSTABILITY (Extreme Stress)
-    if crit >= 80:
+    # Map regime to display properties
+    if regime == "RED":
         return {
             'name': 'CRITICAL INSTABILITY',
-            'color': '#C0392B',  # Terracotta Red (Magma)
+            'color': '#C0392B',  # Red
             'image_key': 'critical_regime',
             'icon': '🔴',
-            'description': 'Criticality Score ≥ 80 (Extreme stress). Danger. Reduce Position Size immediately.'
+            'description': 'High volatility stress'
         }
-    
-    # 3. HIGH ENERGY MANIA (Momentum/Overheated)
-    if crit >= 65 or vola_p > 85:
+    elif regime == "YELLOW":
         return {
-            'name': 'HIGH ENERGY MANIA',
-            'color': '#D35400',  # Pumpkin Orange (Pyrite/Gold)
-            'image_key': 'high_energy_regime',
-            'icon': '🟠',
-            'description': 'Criticality 65-79 or High Volatility. Overheated. Hold with tight Stop-Loss.'
+            'name': 'ACTIVE REGIME',
+            'color': '#F39C12',  # Orange/Yellow
+            'image_key': 'active_regime',
+            'icon': '🟡',
+            'description': 'Medium volatility'
         }
-    
-    # 4. DORMANT STASIS (Low Variance/Sleep Mode)
-    if vola_p < 20:
+    else:  # GREEN
         return {
-            'name': 'DORMANT STASIS',
-            'color': '#27AE60',  # Nephritis Green (Moss)
-            'image_key': 'dormant_regime',
+            'name': 'STABLE GROWTH',
+            'color': '#27AE60',  # Green
+            'image_key': 'stable_regime',
             'icon': '🟢',
-            'description': 'Low volatility, minimal variance. Waiting. Accumulate or Patience.'
+            'description': 'Low volatility'
         }
-    
-    # 5. ORGANIC GROWTH (Healthy Normal) - DEFAULT
-    return {
-        'name': 'ORGANIC GROWTH',
-        'color': '#2980B9',  # Belize Blue (Bismuth)
-        'image_key': 'growth_regime',
-        'icon': '🔵',
-        'description': 'Healthy market structure. Normal parameters. Buy / Hold.'
-    }
 
 
 # =============================================================================
@@ -2130,45 +2382,35 @@ def determine_market_regime(criticality: float, trend: str, volatility_percentil
 
 def get_current_market_state(df: pd.DataFrame, strategy_mode: str = "defensive") -> Dict[str, Any]:
     """
-    Get the current market state (TODAY) using EXACT same logic as DynamicExposureSimulator.
+    REFACTORED: Uses single source of truth compute_market_state().
     
-    This function applies the identical rules used in the backtesting loop to determine
-    whether we should be invested or in cash RIGHT NOW. It replicates the preparation,
-    calculation, and exposure logic without running a full historical simulation.
-    
-    CRITICAL: This function must produce results that are 1:1 identical to what the
-    backtesting simulation shows for the latest data point. If the backtest shows
-    flat line (cash), this MUST return is_invested=False.
+    Get the current market state (TODAY) for display and decision-making.
     
     Args:
         df: DataFrame with OHLCV data (must have 'close' column)
-        strategy_mode: "defensive" or "aggressive" (matches simulation modes)
-            - Defensive: Max safety (Red=20%, Orange=50%, Bear=0%)
-            - Aggressive: Max return (Red=50%, Orange=100%, Bear=0%)
+        strategy_mode: "defensive" or "aggressive" (exposure thresholds)
+            - Defensive: Max safety (Red=20%, Yellow=50%, Bear=0%)
+            - Aggressive: Max return (Red=50%, Yellow=100%, Bear=0%)
     
     Returns:
         Dictionary with:
-        - is_invested (bool): Should we be in the market or cash? (exposure > 0)
+        - is_invested (bool): Should we be in the market or cash?
         - criticality_score (float): Current SOC score (0-100)
-        - regime (str): 'RISK_OFF (Cash)' or 'RISK_ON (Full/Partial/Minimal)'
-        - trend_signal (str): 'BULL' (above SMA200), 'BEAR' (below SMA200)
+        - regime (str): Simplified regime name
+        - regime_name (str): Full regime name for display
+        - regime_color (str): Hex color code
+        - trend_signal (str): 'UP', 'DOWN', 'NEUTRAL'
         - exposure_pct (float): Percentage to invest (0-100)
-        - raw_data (dict): Underlying metrics for debugging/transparency
-    
-    Example:
-        >>> df = yf.download("AAPL", period="2y")
-        >>> state = get_current_market_state(df, strategy_mode="defensive")
-        >>> if state['is_invested']:
-        >>>     print(f"Currently invested at {state['exposure_pct']:.0f}%")
-        >>> else:
-        >>>     print("Currently in cash (RISK_OFF)")
+        - raw_data (dict): Underlying metrics
     """
     # === INPUT VALIDATION ===
     if df is None or df.empty:
         return {
             'is_invested': False,
             'criticality_score': 0.0,
-            'regime': 'RISK_OFF (Cash)',
+            'regime': 'RISK_OFF',
+            'regime_name': 'RISK_OFF (Cash)',
+            'regime_color': '#95A5A6',
             'trend_signal': 'UNKNOWN',
             'exposure_pct': 0.0,
             'error': 'Empty dataframe'
@@ -2178,141 +2420,105 @@ def get_current_market_state(df: pd.DataFrame, strategy_mode: str = "defensive")
         return {
             'is_invested': False,
             'criticality_score': 0.0,
-            'regime': 'RISK_OFF (Cash)',
+            'regime': 'RISK_OFF',
+            'regime_name': 'RISK_OFF (Cash)',
+            'regime_color': '#95A5A6',
             'trend_signal': 'UNKNOWN',
             'exposure_pct': 0.0,
             'error': 'Missing close column'
         }
     
-    # === STEP 1: APPLY EXACT SAME PREPARATION AS DynamicExposureSimulator._prepare_data() ===
-    work_df = df.copy()
-    
-    # Calculate SMA200
-    work_df['sma_200'] = work_df['close'].rolling(window=200).mean()
-    
-    # Calculate returns and volatility
-    work_df['returns'] = work_df['close'].pct_change()
-    work_df['volatility'] = work_df['returns'].rolling(window=30).std()
-    
-    # Drop NaN rows (required for valid calculations)
-    work_df = work_df.dropna(subset=['close', 'sma_200', 'volatility'])
-    
-    if len(work_df) < 30:
+    try:
+        # Use new single source of truth
+        state = compute_market_state(
+            df=df,
+            idx=len(df) - 1,  # Last row (current)
+            sma_window=200,
+            vol_window=30,
+            hysteresis=0.02
+        )
+        
+        # === CALCULATE EXPOSURE BASED ON REGIME AND TREND ===
+        is_aggressive = strategy_mode.lower() == "aggressive"
+        
+        # Exposure rules by strategy mode
+        if is_aggressive:
+            # AGGRESSIVE: Ride momentum
+            red_exposure = 0.5      # RED: 50%
+            yellow_exposure = 1.0   # YELLOW: 100%
+            bear_exposure = 0.0     # Bear: 0%
+        else:
+            # DEFENSIVE: Max safety
+            red_exposure = 0.2      # RED: 20%
+            yellow_exposure = 0.5   # YELLOW: 50%
+            bear_exposure = 0.0     # Bear: 0%
+        
+        # Determine exposure
+        if state.trend_state == "DOWN":
+            exposure = bear_exposure  # Bear market = cash
+        elif state.regime == "RED":
+            exposure = red_exposure
+        elif state.regime == "YELLOW":
+            exposure = yellow_exposure
+        else:  # GREEN
+            exposure = 1.0  # 100% invested
+        
+        # Investment status
+        is_invested = exposure > 0.0
+        
+        # Regime label
+        if is_invested:
+            if exposure >= 1.0:
+                regime_name = 'RISK_ON (Full)'
+            elif exposure >= 0.5:
+                regime_name = 'RISK_ON (Partial)'
+            else:
+                regime_name = 'RISK_ON (Minimal)'
+        else:
+            regime_name = 'RISK_OFF (Cash)'
+        
+        # Get regime color
+        regime_color = get_regime_color(state.regime)
+        
+        # Get current price and SMA
+        current_price = float(df['close'].iloc[-1])
+        sma_200 = df['close'].rolling(window=200).mean().iloc[-1]
+        
+        return {
+            # Core outputs
+            'is_invested': bool(is_invested),
+            'criticality_score': float(state.criticality),
+            'regime': state.regime,
+            'regime_name': regime_name,
+            'regime_color': regime_color,
+            'trend_signal': state.trend_state,
+            'exposure_pct': float(exposure * 100),
+            
+            # Raw data for debugging
+            'raw_data': {
+                'current_price': float(current_price),
+                'sma_200': float(sma_200),
+                'volatility': float(state.volatility),
+                'volatility_percentile': float(state.volatility_percentile),
+                'price_deviation_pct': float((current_price - sma_200) / sma_200 * 100) if sma_200 > 0 else 0,
+                'strategy_mode': strategy_mode,
+                'reason_codes': state.reason_codes
+            }
+        }
+        
+    except Exception as e:
+        # Fallback on error
+        print(f"Error in get_current_market_state: {e}")
         return {
             'is_invested': False,
             'criticality_score': 0.0,
-            'regime': 'RISK_OFF (Cash)',
+            'regime': 'ERROR',
+            'regime_name': 'ERROR',
+            'regime_color': '#95A5A6',
             'trend_signal': 'UNKNOWN',
             'exposure_pct': 0.0,
-            'error': 'Insufficient data after cleaning (need 200+ days)'
+            'error': str(e)
         }
-    
-    # === STEP 2: CALCULATE CRITICALITY SCORE (Rolling Volatility Percentile) ===
-    vol_window = min(504, len(work_df) - 1)  # ~2 years lookback
-    work_df['criticality_score'] = work_df['volatility'].rolling(
-        window=vol_window, min_periods=30
-    ).apply(
-        lambda x: (x.iloc[-1] <= x).sum() / len(x) * 100, raw=False
-    )
-    
-    # === STEP 3: APPLY TREND MODIFIER (Penalize downtrends and parabolic moves) ===
-    work_df['trend_modifier'] = 0
-    # Downtrend (below SMA200): +10 to criticality (higher perceived risk)
-    work_df.loc[work_df['close'] < work_df['sma_200'], 'trend_modifier'] = 10
-    
-    # Parabolic extension (>30% above SMA): +10 to criticality (overextension risk)
-    price_deviation = (work_df['close'] - work_df['sma_200']) / work_df['sma_200'] * 100
-    work_df.loc[price_deviation > 30, 'trend_modifier'] = 10
-    
-    # Apply modifier and clamp to 0-100
-    work_df['criticality_score'] = (work_df['criticality_score'] + work_df['trend_modifier']).clip(0, 100)
-    work_df['criticality_score'] = work_df['criticality_score'].fillna(50)
-    
-    # === STEP 4: DETERMINE TREND (Uptrend = Price > SMA200) ===
-    work_df['is_uptrend'] = work_df['close'] > work_df['sma_200']
-    
-    # === STEP 5: EXTRACT LATEST (CURRENT) DATA POINT ===
-    latest = work_df.iloc[-1]
-    
-    current_price = latest['close']
-    current_sma = latest['sma_200']
-    criticality_score = latest['criticality_score']
-    is_uptrend = latest['is_uptrend']
-    current_volatility = latest['volatility']
-    
-    # === STEP 6: DETERMINE TREND SIGNAL ===
-    if is_uptrend:
-        trend_signal = 'BULL'
-    else:
-        trend_signal = 'BEAR'
-    
-    # === STEP 7: CALCULATE EXPOSURE (EXACT REPLICA OF SIMULATOR LOGIC) ===
-    is_aggressive = strategy_mode.lower() == "aggressive"
-    
-    # Thresholds (must match DynamicExposureSimulator.run_simulation() exactly)
-    high_stress_threshold = 80  # Critical/Red (>80)
-    medium_stress_threshold = 60  # High Energy/Orange (60-80)
-    
-    # Exposure rules by strategy mode (MUST match simulator)
-    if is_aggressive:
-        # AGGRESSIVE MODE: Ride momentum, reduce only at extremes
-        high_stress_exposure = 0.5    # Red/Critical: 50%
-        medium_stress_exposure = 1.0   # Orange/High Energy: 100% (ride it!)
-        bear_market_exposure = 0.0     # Bear: 0% (hard exit)
-    else:
-        # DEFENSIVE MODE: Max safety, protect capital
-        high_stress_exposure = 0.2     # Red/Critical: 20%
-        medium_stress_exposure = 0.5   # Orange/High Energy: 50%
-        bear_market_exposure = 0.0     # Bear: 0%
-    
-    # Apply exposure calculation (exact replica of calc_exposure in run_simulation)
-    if not is_uptrend:
-        exposure = bear_market_exposure  # Bear market = cash
-    elif criticality_score > high_stress_threshold:
-        exposure = high_stress_exposure  # Red/Critical
-    elif criticality_score > medium_stress_threshold:
-        exposure = medium_stress_exposure  # Orange/High Energy
-    else:
-        exposure = 1.0  # Green/Stable = 100% invested
-    
-    # === STEP 8: DETERMINE INVESTMENT STATUS ===
-    is_invested = exposure > 0.0
-    
-    # === STEP 9: DETERMINE REGIME LABEL ===
-    if is_invested:
-        if exposure >= 1.0:
-            regime = 'RISK_ON (Full)'
-        elif exposure >= 0.5:
-            regime = 'RISK_ON (Partial)'
-        else:
-            regime = 'RISK_ON (Minimal)'
-    else:
-        regime = 'RISK_OFF (Cash)'
-    
-    # === STEP 10: RETURN STRUCTURED RESULT ===
-    return {
-        # Core outputs
-        'is_invested': bool(is_invested),
-        'criticality_score': float(criticality_score),
-        'regime': regime,
-        'trend_signal': trend_signal,
-        'exposure_pct': float(exposure * 100),
-        
-        # Raw data for debugging/transparency
-        'raw_data': {
-            'current_price': float(current_price),
-            'sma_200': float(current_sma),
-            'is_uptrend': bool(is_uptrend),
-            'volatility': float(current_volatility),
-            'price_deviation_pct': float((current_price - current_sma) / current_sma * 100) if current_sma > 0 else 0,
-            'strategy_mode': strategy_mode,
-            'high_stress_threshold': high_stress_threshold,
-            'medium_stress_threshold': medium_stress_threshold,
-            'high_stress_exposure': high_stress_exposure * 100,
-            'medium_stress_exposure': medium_stress_exposure * 100,
-            'bear_market_exposure': bear_market_exposure * 100
-        }
-    }
 
 
 # =============================================================================

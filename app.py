@@ -34,7 +34,7 @@ import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 
-from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_metrics, get_current_market_state
+from logic import DataFetcher, SOCAnalyzer, run_dca_simulation, calculate_audit_metrics, get_current_market_state, compute_market_state, MarketState
 from ui_simulation import render_dca_simulation
 from ui_detail import render_detail_panel, render_regime_persistence_chart, render_current_regime_outlook
 from ui_auth import render_disclaimer, render_login_dialog, render_signup_dialog, render_education_landing
@@ -141,14 +141,17 @@ def render_sidebar_login() -> None:
             st.markdown("**Welcome!** 👋")
             st.caption("Access all features with a free account")
             
+            # Local admin hint
+            st.info("💡 **Local Mode:** Login with `admin` / `admin` for full access")
+            
             col_login, col_signup = st.columns(2)
             with col_login:
-                if st.button("🔐 Login", use_container_width=True):
+                if st.button("🔐 Login", use_container_width=True, type="primary"):
                     st.session_state.show_login_dialog = True
                     st.rerun()
             
             with col_signup:
-                if st.button("📝 Sign Up", use_container_width=True, type="primary"):
+                if st.button("📝 Sign Up", use_container_width=True):
                     st.session_state.show_signup_dialog = True
                     st.rerun()
             
@@ -1393,7 +1396,7 @@ def main():
     
     # Session state initialization
     if 'disclaimer_accepted' not in st.session_state:
-        st.session_state.disclaimer_accepted = False
+        st.session_state.disclaimer_accepted = True  # Auto-accept for local use
     if 'dark_mode' not in st.session_state:
         st.session_state.dark_mode = False  # Light mode default
     if 'selected_asset' not in st.session_state:

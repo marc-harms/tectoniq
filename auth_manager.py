@@ -182,6 +182,17 @@ def login(email: str, password: str) -> Tuple[bool, Optional[str], Optional[Dict
         >>> if success:
         >>>     st.session_state.user = user
     """
+    # HARDCODED ADMIN USER (LOCAL USE - NO SUPABASE REQUIRED)
+    if email.lower() == "admin" and password == "admin":
+        user_data = {
+            "id": "local-admin-hardcoded",
+            "email": "admin@localhost",
+            "tier": "premium"
+        }
+        # No Supabase session needed
+        return True, None, user_data
+    
+    # Normal Supabase authentication for other users
     try:
         supabase = get_supabase_client()
         

@@ -197,11 +197,14 @@ def render_login_dialog() -> None:
     st.markdown("### Welcome Back")
     st.caption("Sign in to access your portfolio and premium features")
     
+    # Show admin credentials hint for local use
+    st.info("💡 **Local Mode:** Use credentials `admin` / `admin` for full premium access (no database required)")
+    
     st.markdown("---")
     
     with st.form("login_form_dialog", clear_on_submit=False):
-        email = st.text_input("Email", placeholder="your@email.com", key="login_email_dialog")
-        password = st.text_input("Password", type="password", placeholder="••••••••", key="login_password_dialog")
+        email = st.text_input("Email", placeholder="admin", key="login_email_dialog")
+        password = st.text_input("Password", type="password", placeholder="admin", key="login_password_dialog")
         
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -225,6 +228,7 @@ def render_login_dialog() -> None:
                             st.session_state.user = user_data
                             st.session_state.tier = user_data['tier']
                             st.session_state.authenticated = True
+                            st.session_state.username = email.split('@')[0] if '@' in email else email
                             st.session_state.show_login_dialog = False
                             st.success(f"✅ Welcome back, {user_data['email']}!")
                             st.rerun()
