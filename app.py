@@ -1677,6 +1677,11 @@ def main():
                 regime_text = result.get('signal', 'UNKNOWN')
                 criticality = result.get('criticality_score', 0)
                 
+                # Clean regime text: remove emoji and extra whitespace
+                # The signal field often contains emoji like "⚪ DORMANT REGIME"
+                import re
+                regime_text = re.sub(r'[^\w\s-]', '', regime_text).strip()  # Remove non-alphanumeric except spaces and hyphens
+                
                 # Get color based on criticality
                 if criticality >= 70:
                     regime_color = "#FF6600"  # Red
