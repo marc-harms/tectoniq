@@ -640,7 +640,7 @@ def render_portfolio_input_simple() -> Optional[List[Dict[str, float]]]:
             st.success(f"✅ Weights sum to {total_weight:.1f}%")
         
         # Update button
-        if st.button("Update Portfolio", type="primary", use_container_width=True):
+        if st.button("Update Portfolio", use_container_width=True):
             if abs(total_weight - 100.0) > 0.1:
                 st.error("Weights must sum to 100%")
             else:

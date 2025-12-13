@@ -135,24 +135,24 @@ def render_sidebar_login() -> None:
     from auth_manager import is_authenticated, get_current_user_email, logout as auth_logout
     
     with st.sidebar:
-        st.markdown("### 🔐 Account")
+        st.markdown("### Account")
         
         if not is_authenticated():
             # Not logged in - show signup/login prompts
-            st.markdown("**Welcome!** 👋")
+            st.markdown("**Welcome!**")
             st.caption("Access all features with a free account")
             
             # Local admin hint
-            st.info("💡 **Local Mode:** Login with `admin` / `admin` for full access")
+            st.info("**Local Mode:** Login with `admin` / `admin` for full access")
             
             col_login, col_signup = st.columns(2)
             with col_login:
-                if st.button("🔐 Login", use_container_width=True, type="primary"):
+                if st.button("Login", use_container_width=True):
                     st.session_state.show_login_dialog = True
                     st.rerun()
             
             with col_signup:
-                if st.button("📝 Sign Up", use_container_width=True):
+                if st.button("Sign Up", use_container_width=True):
                     st.session_state.show_signup_dialog = True
                     st.rerun()
             
@@ -210,7 +210,7 @@ def render_sidebar_login() -> None:
             if tier == "premium":
                 st.markdown("---")
                 st.markdown("**Subscription:**")
-                if st.button("📋 Manage Subscription", use_container_width=True):
+                if st.button("Manage Subscription", use_container_width=True):
                     from stripe_manager import create_customer_portal_session
                     from auth_manager import get_stripe_customer_id
                     
@@ -232,7 +232,7 @@ def render_sidebar_login() -> None:
             
             # Logout button
             st.markdown("---")
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button("Logout", use_container_width=True):
                 auth_logout()
                 st.success("Logged out successfully!")
                 st.rerun()
@@ -240,13 +240,13 @@ def render_sidebar_login() -> None:
             # Upgrade prompt for non-premium
             if tier != "premium":
                 st.markdown("---")
-                st.markdown("### ⭐ Upgrade to Premium")
+                st.markdown("### Upgrade to Premium")
                 st.markdown("**$29/month** - Cancel anytime")
                 st.caption("✅ Deep Dive charts & analytics")
                 st.caption("✅ Unlimited simulations")
                 st.caption("✅ Monte Carlo forecasting")
                 
-                if st.button("💳 Upgrade Now", use_container_width=True, type="primary"):
+                if st.button("Upgrade Now", use_container_width=True):
                     from stripe_manager import create_checkout_session
                     
                     user_id = get_current_user_id()
@@ -290,7 +290,7 @@ def show_upgrade_dialog(feature_name: str, tier: str):
         - ✅ 3 simulations per hour
         """)
         
-        if st.button("📝 Sign Up Now", use_container_width=True, type="primary"):
+        if st.button("Sign Up Now", use_container_width=True):
             st.session_state.show_signup_dialog = True
             st.rerun()
             
@@ -305,7 +305,7 @@ def show_upgrade_dialog(feature_name: str, tier: str):
         **Only $29/month** - Cancel anytime
         """)
         
-        if st.button("⭐ Upgrade to Premium", use_container_width=True, type="primary"):
+        if st.button("Upgrade to Premium", use_container_width=True):
             from stripe_manager import create_checkout_session
             
             user_id = get_current_user_id()
@@ -529,7 +529,7 @@ def handle_header_search(query: str, validate_func, search_func, analyze_func):
     if tier == "public":
         if not check_rate_limit('search', 2):
             st.error("🔒 **Search Limit Reached** (2 per hour for unauthenticated users)")
-            if st.button("📝 Sign Up for Free - Unlimited Searches", use_container_width=True, type="primary"):
+            if st.button("Sign Up for Free - Unlimited Searches", use_container_width=True):
                 st.session_state.show_signup_dialog = True
                 st.rerun()
             return
@@ -660,11 +660,11 @@ def render_advanced_analytics(df: pd.DataFrame, is_dark: bool = False) -> None:
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     
     with col1:
-        st.markdown("### 📊 Regime Profile")
+        st.markdown("### Regime Profile")
         st.dataframe(regime_table, use_container_width=True)
     
     with col2:
-        st.markdown("### 🛡️ Protection")
+        st.markdown("### Protection")
         st.metric("True Crashes", crash_metrics['total_crashes_5y'], delta=f"{crash_metrics['detected_count']} detected")
         st.metric(
             "Detection Rate",
@@ -673,7 +673,7 @@ def render_advanced_analytics(df: pd.DataFrame, is_dark: bool = False) -> None:
         )
     
     with col3:
-        st.markdown("### 🎯 Quality")
+        st.markdown("### Quality")
         false_alarms = crash_metrics.get('false_alarms', 0)
         total_signals = crash_metrics.get('total_signals', 0)
         detected = crash_metrics.get('detected_count', 0)
@@ -694,7 +694,7 @@ def render_advanced_analytics(df: pd.DataFrame, is_dark: bool = False) -> None:
         )
     
     with col4:
-        st.markdown("### ⏱️ Timing")
+        st.markdown("### Timing")
         avg_lead = crash_metrics.get('avg_lead_time_days', 0) or 0
         if avg_lead >= 1.0:
             lead_display = f"{avg_lead:.1f} Days"
@@ -1672,7 +1672,7 @@ def main():
                                     st.markdown(f"{regime_emoji} <span style='color: {crit_color}; font-weight: 600;'>Criticality: {crit}</span>", unsafe_allow_html=True)
                                 
                                 with col4:
-                                    if st.button("→ Deep Dive", key=f"deepdive_{row['Ticker']}", use_container_width=True):
+                                    if st.button("Deep Dive", key=f"deepdive_{row['Ticker']}", use_container_width=True):
                                         # Load this asset
                                         st.session_state.current_ticker = row['Ticker']
                                         st.session_state.scan_results = [row['_result']]
@@ -1682,7 +1682,7 @@ def main():
                                         st.rerun()
                                 
                                 with col5:
-                                    if st.button("🗑️", key=f"remove_{row['Ticker']}", help="Remove from portfolio", use_container_width=True):
+                                    if st.button("Remove", key=f"remove_{row['Ticker']}", help="Remove from portfolio", use_container_width=True):
                                         from auth_manager import remove_asset_from_portfolio
                                         success, error = remove_asset_from_portfolio(user_id, row['Ticker'])
                                         if success:
@@ -1745,7 +1745,7 @@ def main():
                             st.error(f"Error analyzing {ticker}: {str(e)}")
         
         # Clear button
-        if st.button("✕ Clear suggestions", key="clear_suggestions"):
+        if st.button("Clear suggestions", key="clear_suggestions"):
             st.session_state.ticker_suggestions = []
             st.rerun()
         
@@ -1774,7 +1774,7 @@ def main():
             # Button to drill down into selected asset
             if 'drill_down_asset' in st.session_state and st.session_state.drill_down_asset:
                 st.markdown("---")
-                if st.button(f"📊 View Detailed Analysis for {st.session_state.drill_down_asset}", 
+                if st.button(f"View Detailed Analysis for {st.session_state.drill_down_asset}", 
                            use_container_width=True, type="secondary"):
                     # Switch to asset view for selected asset
                     st.session_state.view_mode = "asset"
@@ -1786,7 +1786,7 @@ def main():
         render_asset_drill_down_header()
         
         # Back to portfolio button
-        if st.button("← Back to Portfolio", key="back_to_portfolio"):
+        if st.button("Back to Portfolio", key="back_to_portfolio"):
             st.session_state.view_mode = "portfolio"
             st.rerun()
         

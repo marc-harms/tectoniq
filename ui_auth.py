@@ -83,10 +83,9 @@ def render_disclaimer_dialog() -> None:
     
     with col1:
         if st.button(
-            "✅ Accept & Continue",
+            "Accept & Continue",
             disabled=not accepted,
-            use_container_width=True,
-            type="primary"
+            use_container_width=True
         ):
             st.session_state.disclaimer_accepted = True
             st.rerun()
@@ -103,7 +102,7 @@ def render_disclaimer_dialog() -> None:
         st.caption("⚠️ You must check the box above to continue")
 
 
-@st.dialog("⚖️ Full Legal Terms & Disclaimer", width="large")
+@st.dialog("Full Legal Terms & Disclaimer", width="large")
 def render_full_disclaimer_dialog() -> None:
     """
     Show full legal disclaimer text in a scrollable dialog.
@@ -188,7 +187,7 @@ def render_disclaimer() -> None:
     st.stop()
 
 
-@st.dialog("🔐 Sign In to TECTONIQ", width="large")
+@st.dialog("Sign In to TECTONIQ", width="large")
 def render_login_dialog() -> None:
     """
     Modal dialog for user login.
@@ -198,7 +197,7 @@ def render_login_dialog() -> None:
     st.caption("Sign in to access your portfolio and premium features")
     
     # Show admin credentials hint for local use
-    st.info("💡 **Local Mode:** Use credentials `admin` / `admin` for full premium access (no database required)")
+    st.info("**Local Mode:** Use credentials `admin` / `admin` for full premium access (no database required)")
     
     st.markdown("---")
     
@@ -208,7 +207,7 @@ def render_login_dialog() -> None:
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            submit = st.form_submit_button("Login", use_container_width=True, type="primary")
+            submit = st.form_submit_button("Login", use_container_width=True)
         with col2:
             cancel = st.form_submit_button("Cancel", use_container_width=True)
         
@@ -241,7 +240,7 @@ def render_login_dialog() -> None:
     st.caption("Don't have an account? Click 'Sign Up' in the sidebar.")
 
 
-@st.dialog("📝 Create Your TECTONIQ Account", width="large")
+@st.dialog("Create Your TECTONIQ Account", width="large")
 def render_signup_dialog() -> None:
     """
     Modal dialog for user signup.
@@ -261,7 +260,7 @@ def render_signup_dialog() -> None:
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            submit = st.form_submit_button("Create Account", use_container_width=True, type="primary")
+            submit = st.form_submit_button("Create Account", use_container_width=True)
         with col2:
             cancel = st.form_submit_button("Cancel", use_container_width=True)
         

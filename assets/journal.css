@@ -62,10 +62,23 @@
 }
 
 /* ============================================================================
-   GLOBAL BASE
+   GLOBAL BASE (AGGRESSIVE BACKGROUND UNIFICATION)
    ============================================================================ */
 
-.stApp {
+/* Force single background color across entire app */
+html,
+body,
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stHeader"],
+.main,
+.main .block-container,
+section[data-testid="stSidebar"] > div:first-child {
+    background-color: var(--paper-white) !important;
+}
+
+/* Remove any cream/gray frames */
+[data-testid="stAppViewContainer"] > section:first-child {
     background-color: var(--paper-white) !important;
 }
 
@@ -76,6 +89,13 @@
     padding-right: var(--spacing-md) !important;
     padding-top: var(--spacing-lg) !important;
     padding-bottom: var(--spacing-xl) !important;
+}
+
+/* Ensure no background bleed in containers */
+div[data-testid="stVerticalBlock"],
+div[data-testid="stHorizontalBlock"],
+div[class*="css-"] {
+    background-color: transparent !important;
 }
 
 /* ============================================================================
@@ -248,14 +268,18 @@ table tbody td:nth-child(n+2) {
 }
 
 /* ============================================================================
-   BUTTONS (Print-era UI, minimal fill)
+   BUTTONS (AGGRESSIVE NEUTRALIZATION - Print-era UI, minimal fill)
    ============================================================================ */
 
-/* All buttons base style */
+/* All buttons base style - FORCE NEUTRAL APPEARANCE */
 button:not([class*="collapsedControl"]),
 .stButton > button,
 button[kind="primary"],
-button[kind="secondary"] {
+button[kind="secondary"],
+button[data-testid="baseButton-primary"],
+button[data-testid="baseButton-secondary"],
+.stButton button,
+[data-testid="stFormSubmitButton"] button {
     font-family: 'Inter', sans-serif !important;
     font-weight: 500 !important;
     font-size: 0.9375rem !important;
@@ -267,6 +291,9 @@ button[kind="secondary"] {
     background-color: var(--paper-white) !important;
     color: var(--text-primary) !important;
     cursor: pointer !important;
+    /* KILL ALL BLUE */
+    background-image: none !important;
+    box-shadow: none !important;
 }
 
 button:hover:not([class*="collapsedControl"]) {
@@ -274,35 +301,52 @@ button:hover:not([class*="collapsedControl"]) {
     background-color: var(--paper-bg) !important;
 }
 
-/* Primary button */
+/* OVERRIDE: Primary buttons should NOT be blue - neutralize them */
 button[kind="primary"],
-button[data-testid="baseButton-primary"] {
-    background-color: var(--accent-color) !important;
-    border-color: var(--accent-color) !important;
-    color: var(--paper-white) !important;
+button[data-testid="baseButton-primary"],
+.stButton > button[kind="primary"] {
+    background-color: var(--paper-white) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-primary) !important;
+    /* Force override any Streamlit primary styling */
+    background-image: none !important;
 }
 
 button[kind="primary"]:hover,
 button[data-testid="baseButton-primary"]:hover {
-    background-color: var(--accent-light) !important;
-    border-color: var(--accent-light) !important;
+    background-color: var(--paper-bg) !important;
+    border-color: var(--text-secondary) !important;
+    color: var(--text-primary) !important;
 }
 
-/* Secondary button - outline */
+/* Secondary button - same as primary (all neutral) */
 button[kind="secondary"],
 button[data-testid="baseButton-secondary"] {
-    background-color: transparent !important;
-    border: 1px solid var(--accent-color) !important;
-    color: var(--accent-color) !important;
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-medium) !important;
+    color: var(--text-primary) !important;
 }
 
 button[kind="secondary"]:hover,
 button[data-testid="baseButton-secondary"]:hover {
-    background-color: rgba(90, 108, 125, 0.05) !important;
+    background-color: var(--paper-bg) !important;
+    border-color: var(--text-secondary) !important;
+}
+
+/* Form submit buttons - also neutral */
+[data-testid="stFormSubmitButton"] button {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-medium) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-testid="stFormSubmitButton"] button:hover {
+    background-color: var(--paper-bg) !important;
+    border-color: var(--text-secondary) !important;
 }
 
 /* ============================================================================
-   EXPANDERS (Clean, understated)
+   EXPANDERS (Clean, understated, REDUCED CHROME)
    ============================================================================ */
 
 div[data-testid="stExpander"] {
@@ -310,6 +354,8 @@ div[data-testid="stExpander"] {
     border: 1px solid var(--border-light) !important;
     border-radius: 2px !important;
     margin-bottom: var(--spacing-md) !important;
+    /* Remove any default padding/margins */
+    box-shadow: none !important;
 }
 
 div[data-testid="stExpander"] summary {
@@ -319,6 +365,7 @@ div[data-testid="stExpander"] summary {
     padding: var(--spacing-sm) var(--spacing-md) !important;
     cursor: pointer !important;
     transition: background-color 0.15s ease !important;
+    background-color: var(--paper-white) !important;
 }
 
 div[data-testid="stExpander"] summary:hover {
@@ -328,6 +375,16 @@ div[data-testid="stExpander"] summary:hover {
 div[data-testid="stExpander"] div[data-testid="stExpanderDetails"] {
     padding: var(--spacing-md) !important;
     border-top: 1px solid var(--border-light) !important;
+    background-color: var(--paper-white) !important;
+}
+
+/* Remove expander icons if they render as text */
+div[data-testid="stExpander"] summary::marker {
+    content: "" !important;
+}
+
+div[data-testid="stExpander"] summary::-webkit-details-marker {
+    display: none !important;
 }
 
 /* ============================================================================
@@ -428,21 +485,37 @@ div[data-testid="stSlider"] [data-baseweb="slider"] {
 }
 
 /* ============================================================================
-   SIDEBAR (Minimal styling, preserve functionality)
+   SIDEBAR (Minimal styling, preserve functionality, UNIFIED BACKGROUND)
    ============================================================================ */
 
 section[data-testid="stSidebar"] {
-    background-color: var(--paper-bg) !important;
+    background-color: var(--paper-white) !important; /* Changed from paper-bg to paper-white */
     border-right: 1px solid var(--border-light) !important;
+}
+
+section[data-testid="stSidebar"] > div:first-child {
+    background-color: var(--paper-white) !important;
 }
 
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
     color: var(--text-secondary) !important;
 }
 
-/* Preserve sidebar button functionality */
-section[data-testid="stSidebar"] button[kind="header"] {
+/* Preserve sidebar collapse button functionality */
+section[data-testid="stSidebar"] button[kind="header"],
+section[data-testid="stSidebar"] button[class*="collapsedControl"] {
     all: revert !important;
+}
+
+/* Remove sidebar widget chrome */
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+    background-color: transparent !important;
+    padding: 0 !important;
+}
+
+section[data-testid="stSidebar"] .stButton > button {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-light) !important;
 }
 
 /* ============================================================================
@@ -479,6 +552,82 @@ section[data-testid="stSidebar"] button[kind="header"] {
 
 .regime-red {
     color: var(--status-red) !important;
+}
+
+/* ============================================================================
+   ICON TOKEN ELIMINATION (CRITICAL)
+   ============================================================================ */
+
+/* Hide any Material Icons that render as text tokens */
+.material-icons,
+[class*="material-icons"],
+span[class*="material-icons"] {
+    font-family: 'Material Icons' !important;
+    /* If icon font fails to load, hide the text */
+    font-size: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Hide any icon text fallbacks in buttons */
+button span[class*="icon"],
+button .material-icons-text {
+    display: none !important;
+}
+
+/* Ensure sidebar collapse button uses proper icon font */
+section[data-testid="stSidebar"] button[kind="header"] span {
+    font-family: 'Material Icons' !important;
+}
+
+/* ============================================================================
+   WIDGET CHROME REDUCTION (FINAL PASS)
+   ============================================================================ */
+
+/* Remove unnecessary padding from all containers */
+div[data-testid="column"] {
+    padding: 0 !important;
+}
+
+/* Remove chrome from metric containers */
+div[data-testid="stMetricContainer"] {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Reduce chrome on form containers */
+[data-testid="stForm"] {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: 2px !important;
+    padding: var(--spacing-md) !important;
+    box-shadow: none !important;
+}
+
+/* Remove chrome from dialog containers */
+[data-testid="stDialog"] {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-medium) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; /* Minimal shadow */
+}
+
+/* Reduce chrome on selectbox */
+div[data-baseweb="select"] > div {
+    background-color: var(--paper-white) !important;
+    border: 1px solid var(--border-medium) !important;
+    box-shadow: none !important;
+}
+
+/* Remove chrome from text inputs */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+textarea {
+    box-shadow: none !important;
+    background-color: var(--paper-white) !important;
 }
 
 /* ============================================================================

@@ -1,7 +1,7 @@
 [theme]
 base = "light"
 primaryColor = "#5a6c7d"           # Muted accent (clinical, used sparingly)
-backgroundColor = "#FFFFFF"        # Cold paper white (not cream)
-secondaryBackgroundColor = "#FAFAFA"  # Very subtle off-white (sidebar, containers)
+backgroundColor = "#FFFFFF"        # Cold paper white (not cream) - UNIFIED
+secondaryBackgroundColor = "#FFFFFF"  # CHANGED: Same as background for unification
 textColor = "#2B2B2B"              # Charcoal text (high readability)
-font = "serif"                     # Serif font for journal aesthetic
+font = "sans serif"                # Changed to sans-serif to match body text
