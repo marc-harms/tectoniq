@@ -463,8 +463,40 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
     st.markdown(brand_header_css + brand_header_html, unsafe_allow_html=True)
     
     # ==========================================================================
-    # TICKER SEARCH (Below brand, above workflow controls)
+    # ZONE 3: UTILITY BUTTONS (Simplified - below divider)
     # ==========================================================================
+    
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    
+    # Center the buttons
+    col_spacer_left, col_buttons, col_spacer_right = st.columns([1, 2, 1])
+    
+    with col_buttons:
+        # Determine button layout based on authentication
+        from auth_manager import is_authenticated
+        
+        if is_authenticated():
+            # Two buttons: Tectoniq News + Portfolio Analysis
+            btn_col1, btn_col2 = st.columns(2)
+            
+            with btn_col1:
+                if st.button("Tectoniq News", key="header_btn_news", use_container_width=True):
+                    show_news_dialog()
+            
+            with btn_col2:
+                if st.button("Portfolio Analysis", key="header_btn_portfolio", use_container_width=True):
+                    st.session_state.view_mode = "portfolio"
+                    st.rerun()
+        else:
+            # Only one button: Tectoniq News (centered)
+            if st.button("Tectoniq News", key="header_btn_news", use_container_width=True):
+                show_news_dialog()
+    
+    # ==========================================================================
+    # TICKER SEARCH (Below buttons)
+    # ==========================================================================
+    
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
     
     col_spacer1, col_search, col_spacer2 = st.columns([1, 2, 1])
     
@@ -490,53 +522,6 @@ def render_header(validate_ticker_func, search_ticker_func, run_analysis_func):
                 run_analysis_func
             )
         )
-    
-    # ==========================================================================
-    # ZONE 3: WORKFLOW CONTROLS (Navigation + Actions, below divider)
-    # ==========================================================================
-    
-    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-    
-    # Layout: Navigation (left 2 cols) + Actions (right 1 col)
-    col_nav, col_actions = st.columns([2, 1])
-    
-    # LEFT: Primary navigation (tab-like, quiet, no emojis)
-    with col_nav:
-        nav_col1, nav_col2 = st.columns(2)
-        
-        with nav_col1:
-            button_type = "primary" if st.session_state.view_mode == "portfolio" else "secondary"
-            if st.button("Portfolio Risk", key="nav_portfolio", use_container_width=True, type=button_type):
-                st.session_state.view_mode = "portfolio"
-                st.rerun()
-        
-        with nav_col2:
-            button_type = "primary" if st.session_state.view_mode == "asset" else "secondary"
-            # Show asset ticker if selected, otherwise generic label
-            asset_label = "Asset View"
-            if 'current_ticker' in st.session_state and st.session_state.current_ticker:
-                asset_label = st.session_state.current_ticker
-            
-            if st.button(asset_label, key="nav_asset", use_container_width=True, type=button_type):
-                st.session_state.view_mode = "asset"
-                st.rerun()
-    
-    # RIGHT: Secondary actions (utility, smaller visual weight)
-    with col_actions:
-        action_col1, action_col2 = st.columns(2)
-        
-        with action_col1:
-            if st.button("System Updates", key="header_btn_updates", use_container_width=True):
-                show_news_dialog()
-        
-        with action_col2:
-            if st.button("Refresh", key="header_refresh_btn", use_container_width=True):
-                st.cache_data.clear()
-                if 'data' in st.session_state:
-                    del st.session_state['data']
-                if 'scan_results' in st.session_state:
-                    del st.session_state['scan_results']
-                st.rerun()
     
     st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
 
